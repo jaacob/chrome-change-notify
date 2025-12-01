@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>DOM Monitor - Manage</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f9fa;
+      min-height: 100vh;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 32px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state h2 {
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      color: #666;
+    }
+
+    .monitor-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .monitor-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: box-shadow 0.2s ease;
+    }
+
+    .monitor-card:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .monitor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .monitor-url {
+      font-size: 14px;
+      color: #4285f4;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .monitor-url:hover {
+      text-decoration: underline;
+    }
+
+    .monitor-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-check {
+      background: #e8f0fe;
+      color: #4285f4;
+    }
+
+    .btn-check:hover {
+      background: #d2e3fc;
+    }
+
+    .btn-delete {
+      background: #fce8e6;
+      color: #d93025;
+    }
+
+    .btn-delete:hover {
+      background: #f8d7da;
+    }
+
+    .monitor-selector {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      background: #f1f3f4;
+      padding: 8px 12px;
+      border-radius: 4px;
+      color: #5f6368;
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+
+    .monitor-preview {
+      font-size: 13px;
+      color: #666;
+      padding: 12px;
+      background: #fafafa;
+      border-left: 3px solid #4285f4;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 16px;
+    }
+
+    .monitor-meta {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .monitor-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .interval-select {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 12px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .interval-select:hover {
+      border-color: #4285f4;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .status-active {
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: #34a853;
+    }
+
+    .toast.error {
+      background: #d93025;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>👁 DOM Monitor</h1>
+    <p class="subtitle">Manage your monitored elements</p>
+
+    <div id="content">
+      <!-- Content loaded by JS -->
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="manage.js"></script>
+</body>
+</html>
