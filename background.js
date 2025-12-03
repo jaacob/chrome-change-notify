@@ -131,8 +131,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'checkAllNow':
       checkAllMonitors().then(sendResponse);
       return true;
+    case 'acknowledgeChange':
+      acknowledgeChange(message.id).then(sendResponse);
+      return true;
   }
 });
+
+// Clear the change indicator for a monitor
+async function acknowledgeChange(monitorId) {
+  await updateMonitorInStorage(monitorId, { lastChangeDetected: null });
+  return { success: true };
+}
 
 // Check all monitors sequentially with progress reporting
 async function checkAllMonitors() {
@@ -453,6 +462,7 @@ async function checkForChanges(monitorId) {
       updates.changeCount = (monitor.changeCount || 0) + 1;
       updates.elementPreview = currentContent.substring(0, 100) +
         (currentContent.length > 100 ? '...' : '');
+      updates.lastChangeDetected = Date.now();
     }
     await updateMonitorInStorage(monitorId, updates);
 

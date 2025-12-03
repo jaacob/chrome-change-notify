@@ -1,10 +1,12 @@
 let monitors = [];
 let timestampInterval = null;
 let isCheckingAll = false;
+let currentFilter = 'all';
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
   setupCheckAllButton();
+  setupFilterTabs();
   listenForProgressUpdates();
   // Update relative timestamps every minute
   timestampInterval = setInterval(updateTimestamps, 60000);
@@ -24,6 +26,69 @@ document.addEventListener('visibilitychange', () => {
 function setupCheckAllButton() {
   const checkAllBtn = document.getElementById('checkAllBtn');
   checkAllBtn.addEventListener('click', checkAllNow);
+}
+
+function setupFilterTabs() {
+  const filterTabs = document.querySelectorAll('.filter-tab');
+  filterTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const filter = tab.dataset.filter;
+      currentFilter = filter;
+
+      // Update active tab
+      filterTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Apply filter
+      applyFilter();
+    });
+  });
+}
+
+function applyFilter() {
+  const cards = document.querySelectorAll('.monitor-card');
+  let visibleCount = 0;
+
+  cards.forEach(card => {
+    const isChanged = card.classList.contains('changed');
+    const shouldShow = currentFilter === 'all' || (currentFilter === 'changed' && isChanged);
+
+    card.style.display = shouldShow ? 'block' : 'none';
+    if (shouldShow) visibleCount++;
+  });
+
+  // Show "no results" message if needed
+  const monitorList = document.querySelector('.monitor-list');
+  const existingNoResults = document.querySelector('.no-results');
+
+  if (existingNoResults) {
+    existingNoResults.remove();
+  }
+
+  if (visibleCount === 0 && monitors.length > 0) {
+    const noResults = document.createElement('div');
+    noResults.className = 'no-results';
+    noResults.textContent = currentFilter === 'changed'
+      ? 'No changed monitors. All monitors are up to date!'
+      : 'No monitors found.';
+    monitorList.appendChild(noResults);
+  }
+}
+
+function updateFilterCounts() {
+  const changedCount = monitors.filter(m => m.lastChangeDetected).length;
+  const totalCount = monitors.length;
+
+  document.getElementById('countAll').textContent = totalCount;
+  document.getElementById('countChanged').textContent = changedCount;
+
+  // Show/hide filter bar
+  const filterBar = document.getElementById('filterBar');
+  if (totalCount > 0) {
+    filterBar.classList.add('active');
+  } else {
+    filterBar.classList.remove('active');
+  }
 }
 
 function listenForProgressUpdates() {
@@ -132,6 +197,7 @@ function renderMonitors(monitors) {
 
   if (monitors.length === 0) {
     checkAllBtn.style.display = 'none';
+    document.getElementById('filterBar').classList.remove('active');
     content.innerHTML = `
       <div class="empty-state">
         <div class="icon">🔍</div>
@@ -153,6 +219,9 @@ function renderMonitors(monitors) {
 
   content.innerHTML = html;
 
+  // Update filter counts
+  updateFilterCounts();
+
   // Add event listeners
   monitors.forEach(monitor => {
     const card = document.getElementById(`monitor-${monitor.id}`);
@@ -171,7 +240,18 @@ function renderMonitors(monitors) {
     card.querySelector('.interval-select').addEventListener('change', (e) => {
       updateInterval(monitor.id, parseInt(e.target.value));
     });
+
+    // Dismiss button (for changed monitors)
+    const dismissBtn = card.querySelector('.btn-dismiss');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        acknowledgeChange(monitor.id);
+      });
+    }
   });
+
+  // Apply current filter
+  applyFilter();
 }
 
 function renderMonitorCard(monitor) {
@@ -179,17 +259,28 @@ function renderMonitorCard(monitor) {
   const hostname = url.hostname;
   const lastChecked = formatRelativeTime(monitor.lastChecked);
   const created = formatDate(monitor.createdAt);
+  const hasChange = !!monitor.lastChangeDetected;
 
   const intervalOptions = INTERVAL_OPTIONS.map(opt =>
     `<option value="${opt.value}" ${opt.value === monitor.intervalMinutes ? 'selected' : ''}>${opt.label}</option>`
   ).join('');
 
+  const changeBadge = hasChange ? `
+    <span class="change-badge">
+      Changed ${formatRelativeTime(monitor.lastChangeDetected)}
+      <button class="btn btn-dismiss">Dismiss</button>
+    </span>
+  ` : '';
+
   return `
-    <div class="monitor-card" id="monitor-${monitor.id}">
+    <div class="monitor-card${hasChange ? ' changed' : ''}" id="monitor-${monitor.id}">
       <div class="monitor-header">
-        <a href="${monitor.url}" target="_blank" class="monitor-url" title="${monitor.url}">
-          ${hostname}${url.pathname !== '/' ? url.pathname : ''}
-        </a>
+        <div>
+          <a href="${monitor.url}" target="_blank" class="monitor-url" title="${monitor.url}">
+            ${hostname}${url.pathname !== '/' ? url.pathname : ''}
+          </a>
+          ${changeBadge}
+        </div>
         <div class="monitor-actions">
           <button class="btn btn-check">Check Now</button>
           <button class="btn btn-delete">Delete</button>
@@ -281,6 +372,19 @@ function updateInterval(id, intervalMinutes) {
       showToast('Interval updated', 'success');
     } else {
       showToast('Failed to update interval', 'error');
+    }
+  });
+}
+
+function acknowledgeChange(id) {
+  chrome.runtime.sendMessage({
+    action: 'acknowledgeChange',
+    id
+  }, (response) => {
+    if (response && response.success) {
+      loadMonitors();
+    } else {
+      showToast('Failed to dismiss change', 'error');
     }
   });
 }

@@ -70,10 +70,46 @@
       padding: 20px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
       transition: box-shadow 0.2s ease;
+      border-left: 4px solid transparent;
     }
 
     .monitor-card:hover {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .monitor-card.changed {
+      border-left-color: #f9ab00;
+      background: linear-gradient(to right, #fef7e0 0%, white 100px);
+    }
+
+    .change-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: #f9ab00;
+      color: white;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 12px;
+      animation: pulse-badge 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-badge {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .btn-dismiss {
+      background: #f1f3f4;
+      color: #5f6368;
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+
+    .btn-dismiss:hover {
+      background: #e8eaed;
     }
 
     .monitor-header {
@@ -307,6 +343,67 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    .filter-bar {
+      display: none;
+      margin-bottom: 20px;
+    }
+
+    .filter-bar.active {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 4px;
+      background: white;
+      padding: 4px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .filter-tab {
+      padding: 8px 16px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5f6368;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .filter-tab:hover {
+      background: #f1f3f4;
+    }
+
+    .filter-tab.active {
+      background: #4285f4;
+      color: white;
+    }
+
+    .filter-tab .count {
+      display: inline-block;
+      min-width: 18px;
+      padding: 2px 6px;
+      margin-left: 6px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    .filter-tab.active .count {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .no-results {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -330,6 +427,17 @@
         <div class="progress-fill" id="progressFill"></div>
       </div>
       <div class="progress-current" id="progressCurrent">Starting...</div>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all">
+          All <span class="count" id="countAll">0</span>
+        </button>
+        <button class="filter-tab" data-filter="changed">
+          Changed <span class="count" id="countChanged">0</span>
+        </button>
+      </div>
     </div>
 
     <div id="content">
