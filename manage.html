@@ -404,6 +404,49 @@
       padding: 40px 20px;
       color: #666;
     }
+
+    .notification-banner {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .notification-banner.hidden {
+      display: none;
+    }
+
+    .notification-banner-text {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #856404;
+    }
+
+    .notification-banner-text strong {
+      color: #664d03;
+    }
+
+    .btn-enable-notifications {
+      padding: 10px 20px;
+      background: #ffc107;
+      color: #664d03;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-enable-notifications:hover {
+      background: #e0a800;
+    }
   </style>
 </head>
 <body>
@@ -415,6 +458,16 @@
       </div>
       <button class="btn-check-all" id="checkAllBtn" style="display: none;">
         Check All Now
+      </button>
+    </div>
+
+    <div class="notification-banner hidden" id="notificationBanner">
+      <div class="notification-banner-text">
+        <span>⚠️</span>
+        <span><strong>Notifications disabled.</strong> Enable notifications to get alerts when monitored content changes.</span>
+      </div>
+      <button class="btn-enable-notifications" id="enableNotificationsBtn">
+        Enable Notifications
       </button>
     </div>
 

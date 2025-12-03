@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
   setupCheckAllButton();
   setupFilterTabs();
+  setupNotificationBanner();
   listenForProgressUpdates();
   // Update relative timestamps every minute
   timestampInterval = setInterval(updateTimestamps, 60000);
@@ -88,6 +89,54 @@ function updateFilterCounts() {
     filterBar.classList.add('active');
   } else {
     filterBar.classList.remove('active');
+  }
+}
+
+function setupNotificationBanner() {
+  const banner = document.getElementById('notificationBanner');
+  const enableBtn = document.getElementById('enableNotificationsBtn');
+
+  // Check current notification permission
+  checkNotificationPermission();
+
+  enableBtn.addEventListener('click', async () => {
+    try {
+      const permission = await Notification.requestPermission();
+
+      if (permission === 'granted') {
+        banner.classList.add('hidden');
+        showToast('Notifications enabled!', 'success');
+
+        // Send a test notification
+        const notification = new Notification('DOM Monitor', {
+          body: 'Notifications are now enabled! You\'ll be alerted when changes are detected.',
+          icon: chrome.runtime.getURL('icons/icon128.png')
+        });
+
+        // Store that we've granted permission
+        chrome.storage.local.set({ notificationsEnabled: true });
+      } else {
+        showToast('Notification permission denied', 'error');
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      showToast('Failed to enable notifications', 'error');
+    }
+  });
+}
+
+function checkNotificationPermission() {
+  const banner = document.getElementById('notificationBanner');
+
+  if (!('Notification' in window)) {
+    banner.classList.add('hidden');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    banner.classList.add('hidden');
+  } else {
+    banner.classList.remove('hidden');
   }
 }
 

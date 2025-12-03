@@ -64,6 +64,9 @@ Chrome doesn't allow windows positioned completely off-screen (`left: -10000` wi
 ### 5. Alarm Stampede After Sleep
 When the computer wakes from sleep, all pending alarms fire at once. The queue system and staggered scheduling prevent this from overwhelming the system.
 
+### 6. Notification requireInteraction on macOS
+**Do NOT use `requireInteraction: true`** in `chrome.notifications.create()` options. On macOS, this causes notifications to silently fail - Chrome reports success but nothing appears. The notification will still work without this option, it just won't persist until clicked.
+
 ## Making Changes
 
 ### Adding a New Feature
@@ -97,7 +100,8 @@ The check flow is:
     lastChecked: number,
     createdAt: number,
     changeCount: number,
-    isDynamic: boolean
+    isDynamic: boolean,
+    lastChangeDetected: number | null  // timestamp when change was detected, null after acknowledged
   }],
   stickyWindowId: number | null,
   checkAllProgress: {

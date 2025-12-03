@@ -606,23 +606,28 @@ function extractElementContent(selector, selectorPath) {
 // ============================================================================
 
 async function showNotification(monitor, title, message) {
+  const notificationId = `monitor_${monitor.id}_${Date.now()}`;
+  const iconUrl = chrome.runtime.getURL('icons/icon128.png');
+
   try {
-    await chrome.notifications.create(`notification_${monitor.id}_${Date.now()}`, {
+    await chrome.notifications.create(notificationId, {
       type: 'basic',
-      iconUrl: 'icons/icon128.png',
+      iconUrl: iconUrl,
       title: title,
       message: message,
-      priority: 2,
-      requireInteraction: true
+      priority: 2
+      // Note: requireInteraction is intentionally omitted - it breaks notifications on macOS
     });
+    return notificationId;
   } catch (error) {
     console.error('Failed to show notification:', error);
+    return null;
   }
 }
 
 chrome.notifications.onClicked.addListener((notificationId) => {
   const parts = notificationId.split('_');
-  if (parts[0] === 'notification') {
+  if (parts[0] === 'monitor') {
     const monitorId = parts[1];
     getMonitors().then(monitors => {
       const monitor = monitors.find(m => m.id === monitorId);
