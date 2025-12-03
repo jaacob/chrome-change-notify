@@ -1,8 +1,11 @@
 let monitors = [];
 let timestampInterval = null;
+let isCheckingAll = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
+  setupCheckAllButton();
+  listenForProgressUpdates();
   // Update relative timestamps every minute
   timestampInterval = setInterval(updateTimestamps, 60000);
 });
@@ -17,6 +20,78 @@ document.addEventListener('visibilitychange', () => {
     timestampInterval = setInterval(updateTimestamps, 60000);
   }
 });
+
+function setupCheckAllButton() {
+  const checkAllBtn = document.getElementById('checkAllBtn');
+  checkAllBtn.addEventListener('click', checkAllNow);
+}
+
+function listenForProgressUpdates() {
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.checkAllProgress) {
+      const progress = changes.checkAllProgress.newValue;
+      if (progress) {
+        updateProgressUI(progress);
+      }
+    }
+  });
+
+  // Check if there's an active check in progress on page load
+  chrome.storage.local.get(['checkAllProgress'], (result) => {
+    if (result.checkAllProgress && result.checkAllProgress.status === 'running') {
+      updateProgressUI(result.checkAllProgress);
+    }
+  });
+}
+
+function updateProgressUI(progress) {
+  const progressBar = document.getElementById('progressBar');
+  const progressCount = document.getElementById('progressCount');
+  const progressFill = document.getElementById('progressFill');
+  const progressCurrent = document.getElementById('progressCurrent');
+  const checkAllBtn = document.getElementById('checkAllBtn');
+
+  if (progress.status === 'running') {
+    isCheckingAll = true;
+    progressBar.classList.add('active');
+    checkAllBtn.disabled = true;
+    checkAllBtn.textContent = 'Checking...';
+
+    const percent = progress.total > 0 ? (progress.current / progress.total) * 100 : 0;
+    progressCount.textContent = `${progress.current} / ${progress.total}`;
+    progressFill.style.width = `${percent}%`;
+    progressCurrent.textContent = progress.currentUrl || 'Starting...';
+  } else if (progress.status === 'complete') {
+    isCheckingAll = false;
+    progressBar.classList.remove('active');
+    checkAllBtn.disabled = false;
+    checkAllBtn.textContent = 'Check All Now';
+
+    const changedCount = progress.changedCount || 0;
+    if (changedCount > 0) {
+      showToast(`Done! ${changedCount} change${changedCount > 1 ? 's' : ''} detected.`, 'success');
+    } else {
+      showToast('Done! No changes detected.', 'success');
+    }
+
+    // Refresh the list to show updated timestamps/previews
+    loadMonitors();
+
+    // Clear progress from storage
+    chrome.storage.local.remove(['checkAllProgress']);
+  }
+}
+
+function checkAllNow() {
+  if (isCheckingAll || monitors.length === 0) return;
+
+  isCheckingAll = true;
+  const checkAllBtn = document.getElementById('checkAllBtn');
+  checkAllBtn.disabled = true;
+  checkAllBtn.textContent = 'Checking...';
+
+  chrome.runtime.sendMessage({ action: 'checkAllNow' });
+}
 
 function updateTimestamps() {
   monitors.forEach(monitor => {
@@ -53,8 +128,10 @@ function loadMonitors() {
 
 function renderMonitors(monitors) {
   const content = document.getElementById('content');
+  const checkAllBtn = document.getElementById('checkAllBtn');
 
   if (monitors.length === 0) {
+    checkAllBtn.style.display = 'none';
     content.innerHTML = `
       <div class="empty-state">
         <div class="icon">🔍</div>
@@ -64,6 +141,9 @@ function renderMonitors(monitors) {
     `;
     return;
   }
+
+  // Show the Check All button when there are monitors
+  checkAllBtn.style.display = 'block';
 
   const html = `
     <div class="monitor-list">

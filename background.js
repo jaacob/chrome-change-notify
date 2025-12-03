@@ -128,8 +128,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       // For manual checks, run immediately (don't queue)
       checkForChanges(message.id).then(sendResponse);
       return true;
+    case 'checkAllNow':
+      checkAllMonitors().then(sendResponse);
+      return true;
   }
 });
+
+// Check all monitors sequentially with progress reporting
+async function checkAllMonitors() {
+  const monitors = await getMonitors();
+
+  if (monitors.length === 0) {
+    return { success: true, total: 0, changedCount: 0 };
+  }
+
+  let changedCount = 0;
+
+  // Initialize progress
+  await chrome.storage.local.set({
+    checkAllProgress: {
+      status: 'running',
+      current: 0,
+      total: monitors.length,
+      currentUrl: '',
+      changedCount: 0
+    }
+  });
+
+  for (let i = 0; i < monitors.length; i++) {
+    const monitor = monitors[i];
+    const hostname = new URL(monitor.url).hostname;
+    const pathname = new URL(monitor.url).pathname;
+    const displayUrl = hostname + (pathname !== '/' ? pathname : '');
+
+    // Update progress - show which monitor we're checking (1-indexed for humans)
+    await chrome.storage.local.set({
+      checkAllProgress: {
+        status: 'running',
+        current: i + 1,
+        total: monitors.length,
+        currentUrl: `Checking: ${displayUrl}`,
+        changedCount
+      }
+    });
+
+    try {
+      const result = await checkForChanges(monitor.id);
+      if (result.changed) {
+        changedCount++;
+      }
+    } catch (error) {
+      console.error('Error checking monitor:', monitor.id, error);
+    }
+
+    // Small delay between checks
+    if (i < monitors.length - 1) {
+      await sleep(1000);
+    }
+  }
+
+  // Mark complete
+  await chrome.storage.local.set({
+    checkAllProgress: {
+      status: 'complete',
+      current: monitors.length,
+      total: monitors.length,
+      currentUrl: '',
+      changedCount
+    }
+  });
+
+  return { success: true, total: monitors.length, changedCount };
+}
 
 // ============================================================================
 // QUEUE MANAGEMENT

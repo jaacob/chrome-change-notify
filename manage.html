@@ -215,12 +215,122 @@
     .toast.error {
       background: #d93025;
     }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 32px;
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .header-left .subtitle {
+      margin-bottom: 0;
+    }
+
+    .btn-check-all {
+      padding: 10px 20px;
+      background: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-check-all:hover {
+      background: #3367d6;
+    }
+
+    .btn-check-all:disabled {
+      background: #9aa0a6;
+      cursor: not-allowed;
+    }
+
+    .progress-bar {
+      display: none;
+      margin-bottom: 24px;
+      background: white;
+      border-radius: 8px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-bar.active {
+      display: block;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .progress-count {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .progress-track {
+      height: 8px;
+      background: #e8eaed;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #4285f4;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .progress-current {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>👁 DOM Monitor</h1>
-    <p class="subtitle">Manage your monitored elements</p>
+    <div class="header-row">
+      <div class="header-left">
+        <h1>👁 DOM Monitor</h1>
+        <p class="subtitle">Manage your monitored elements</p>
+      </div>
+      <button class="btn-check-all" id="checkAllBtn" style="display: none;">
+        Check All Now
+      </button>
+    </div>
+
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-header">
+        <span class="progress-text">Checking monitors...</span>
+        <span class="progress-count" id="progressCount">0 / 0</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-current" id="progressCurrent">Starting...</div>
+    </div>
 
     <div id="content">
       <!-- Content loaded by JS -->
