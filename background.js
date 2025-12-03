@@ -16,23 +16,37 @@ let stickyWindowId = null;
 // EXTENSION LIFECYCLE
 // ============================================================================
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get(['monitors'], (result) => {
-    if (!result.monitors) {
-      chrome.storage.local.set({ monitors: [] });
+chrome.runtime.onInstalled.addListener(async () => {
+  const result = await chrome.storage.local.get(['monitors']);
+  if (!result.monitors) {
+    await chrome.storage.local.set({ monitors: [] });
+  }
+  // Clean up any orphaned sticky window from previous install
+  await cleanupOrphanedWindow();
+  scheduleAllMonitors();
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  // Validate stored window ID on startup
+  await cleanupOrphanedWindow();
+  scheduleAllMonitors();
+});
+
+// Clean up orphaned sticky window if it no longer exists
+async function cleanupOrphanedWindow() {
+  const stored = await chrome.storage.local.get(['stickyWindowId']);
+  if (stored.stickyWindowId) {
+    try {
+      await chrome.windows.get(stored.stickyWindowId);
+      // Window exists, keep it
+    } catch (e) {
+      // Window doesn't exist, clear the stored ID
+      await chrome.storage.local.remove(['stickyWindowId']);
+      stickyWindowId = null;
     }
-  });
-  scheduleAllMonitors();
-});
+  }
+}
 
-chrome.runtime.onStartup.addListener(() => {
-  scheduleAllMonitors();
-});
-
-// Clean up sticky window when extension is suspended
-chrome.runtime.onSuspend?.addListener(() => {
-  closeStickyWindow();
-});
 
 // ============================================================================
 // BADGE MANAGEMENT
@@ -262,22 +276,36 @@ async function scheduleAllMonitors() {
 // ============================================================================
 
 async function ensureStickyWindow() {
-  // Check if existing window is still valid
+  // First, try to get window ID from memory
   if (stickyWindowId) {
     try {
       const window = await chrome.windows.get(stickyWindowId);
-      // Make sure it's still minimized
       if (window.state !== 'minimized') {
         await chrome.windows.update(stickyWindowId, { state: 'minimized' });
       }
       return stickyWindowId;
     } catch (e) {
-      // Window was closed by user
       stickyWindowId = null;
     }
   }
 
-  // Create new sticky window (minimized)
+  // Memory was empty (service worker restarted) - check storage
+  const stored = await chrome.storage.local.get(['stickyWindowId']);
+  if (stored.stickyWindowId) {
+    try {
+      const window = await chrome.windows.get(stored.stickyWindowId);
+      if (window.state !== 'minimized') {
+        await chrome.windows.update(stored.stickyWindowId, { state: 'minimized' });
+      }
+      stickyWindowId = stored.stickyWindowId;
+      return stickyWindowId;
+    } catch (e) {
+      // Window no longer exists, clear storage
+      await chrome.storage.local.remove(['stickyWindowId']);
+    }
+  }
+
+  // No valid window exists - create new one
   const window = await chrome.windows.create({
     url: 'about:blank',
     type: 'popup',
@@ -286,22 +314,31 @@ async function ensureStickyWindow() {
     focused: false
   });
 
-  // Minimize it immediately
+  // Minimize immediately
   await chrome.windows.update(window.id, { state: 'minimized' });
 
+  // Save to both memory and storage
   stickyWindowId = window.id;
+  await chrome.storage.local.set({ stickyWindowId: window.id });
+
   return stickyWindowId;
 }
 
 async function closeStickyWindow() {
-  if (stickyWindowId) {
+  // Get from storage in case service worker restarted
+  const stored = await chrome.storage.local.get(['stickyWindowId']);
+  const windowIdToClose = stickyWindowId || stored.stickyWindowId;
+
+  if (windowIdToClose) {
     try {
-      await chrome.windows.remove(stickyWindowId);
+      await chrome.windows.remove(windowIdToClose);
     } catch (e) {
       // Already closed
     }
-    stickyWindowId = null;
   }
+
+  stickyWindowId = null;
+  await chrome.storage.local.remove(['stickyWindowId']);
 }
 
 // ============================================================================
