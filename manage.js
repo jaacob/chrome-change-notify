@@ -2,6 +2,8 @@ let monitors = [];
 let timestampInterval = null;
 let isCheckingAll = false;
 let currentFilter = 'all';
+let archivedSearchQuery = '';
+let archivedSectionExpanded = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
@@ -47,7 +49,11 @@ function setupFilterTabs() {
 }
 
 function applyFilter() {
-  const cards = document.querySelectorAll('.monitor-card');
+  // Only filter active monitors (not archived ones)
+  const monitorList = document.querySelector('.monitor-list');
+  if (!monitorList) return;
+
+  const cards = monitorList.querySelectorAll('.monitor-card');
   let visibleCount = 0;
 
   cards.forEach(card => {
@@ -59,14 +65,14 @@ function applyFilter() {
   });
 
   // Show "no results" message if needed
-  const monitorList = document.querySelector('.monitor-list');
-  const existingNoResults = document.querySelector('.no-results');
+  const existingNoResults = monitorList.querySelector('.no-results');
 
   if (existingNoResults) {
     existingNoResults.remove();
   }
 
-  if (visibleCount === 0 && monitors.length > 0) {
+  const activeMonitors = monitors.filter(m => !m.isArchived);
+  if (visibleCount === 0 && activeMonitors.length > 0) {
     const noResults = document.createElement('div');
     noResults.className = 'no-results';
     noResults.textContent = currentFilter === 'changed'
@@ -77,13 +83,15 @@ function applyFilter() {
 }
 
 function updateFilterCounts() {
-  const changedCount = monitors.filter(m => m.lastChangeDetected).length;
-  const totalCount = monitors.length;
+  // Only count active (non-archived) monitors for filter tabs
+  const activeMonitors = monitors.filter(m => !m.isArchived);
+  const changedCount = activeMonitors.filter(m => m.lastChangeDetected).length;
+  const totalCount = activeMonitors.length;
 
   document.getElementById('countAll').textContent = totalCount;
   document.getElementById('countChanged').textContent = changedCount;
 
-  // Show/hide filter bar
+  // Show/hide filter bar (only if there are active monitors)
   const filterBar = document.getElementById('filterBar');
   if (totalCount > 0) {
     filterBar.classList.add('active');
@@ -142,10 +150,18 @@ function checkNotificationPermission() {
 
 function listenForProgressUpdates() {
   chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'local' && changes.checkAllProgress) {
-      const progress = changes.checkAllProgress.newValue;
-      if (progress) {
-        updateProgressUI(progress);
+    if (namespace === 'local') {
+      // Handle check-all progress updates
+      if (changes.checkAllProgress) {
+        const progress = changes.checkAllProgress.newValue;
+        if (progress) {
+          updateProgressUI(progress);
+        }
+      }
+      // Auto-refresh when monitors change (e.g., from background timer checks)
+      if (changes.monitors && !isCheckingAll) {
+        monitors = changes.monitors.newValue || [];
+        renderMonitors(monitors);
       }
     }
   });
@@ -244,6 +260,19 @@ function renderMonitors(monitors) {
   const content = document.getElementById('content');
   const checkAllBtn = document.getElementById('checkAllBtn');
 
+  // Separate active and archived monitors
+  const activeMonitors = monitors.filter(m => !m.isArchived);
+  const archivedMonitors = monitors.filter(m => m.isArchived);
+
+  // Filter archived monitors by search query
+  const filteredArchivedMonitors = archivedMonitors.filter(m => {
+    if (!archivedSearchQuery) return true;
+    const query = archivedSearchQuery.toLowerCase();
+    return m.url.toLowerCase().includes(query) ||
+           m.selector.toLowerCase().includes(query) ||
+           (m.elementPreview && m.elementPreview.toLowerCase().includes(query));
+  });
+
   if (monitors.length === 0) {
     checkAllBtn.style.display = 'none';
     document.getElementById('filterBar').classList.remove('active');
@@ -257,72 +286,195 @@ function renderMonitors(monitors) {
     return;
   }
 
-  // Show the Check All button when there are monitors
-  checkAllBtn.style.display = 'block';
+  // Show the Check All button when there are active monitors
+  checkAllBtn.style.display = activeMonitors.length > 0 ? 'block' : 'none';
 
-  const html = `
-    <div class="monitor-list">
-      ${monitors.map(monitor => renderMonitorCard(monitor)).join('')}
-    </div>
-  `;
+  let html = '';
+
+  // Active monitors section
+  if (activeMonitors.length > 0) {
+    html += `
+      <div class="monitor-list">
+        ${activeMonitors.map(monitor => renderMonitorCard(monitor, false)).join('')}
+      </div>
+    `;
+  } else if (archivedMonitors.length > 0) {
+    html += `
+      <div class="empty-state" style="padding: 40px 20px;">
+        <p>No active monitors. All monitors are archived.</p>
+      </div>
+    `;
+  }
+
+  // Archived monitors section
+  if (archivedMonitors.length > 0) {
+    html += `
+      <div class="archived-section">
+        <div class="archived-header" id="archivedHeader">
+          <span class="archived-toggle">${archivedSectionExpanded ? '▼' : '▶'}</span>
+          <span>Archived Monitors (${archivedMonitors.length})</span>
+        </div>
+        <div class="archived-content ${archivedSectionExpanded ? 'expanded' : ''}">
+          <div class="archived-search">
+            <input type="text" id="archivedSearchInput" placeholder="Search archived monitors..." value="${escapeHtml(archivedSearchQuery)}">
+          </div>
+          <div class="archived-list">
+            ${filteredArchivedMonitors.length > 0 ?
+              filteredArchivedMonitors.map(monitor => renderMonitorCard(monitor, true)).join('') :
+              '<div class="no-results">No archived monitors match your search.</div>'
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   content.innerHTML = html;
 
   // Update filter counts
   updateFilterCounts();
 
-  // Add event listeners
-  monitors.forEach(monitor => {
-    const card = document.getElementById(`monitor-${monitor.id}`);
-
-    // Delete button
-    card.querySelector('.btn-delete').addEventListener('click', () => {
-      deleteMonitor(monitor.id);
-    });
-
-    // Check now button
-    card.querySelector('.btn-check').addEventListener('click', () => {
-      checkNow(monitor.id);
-    });
-
-    // Interval select
-    card.querySelector('.interval-select').addEventListener('change', (e) => {
-      updateInterval(monitor.id, parseInt(e.target.value));
-    });
-
-    // Dismiss button (for changed monitors)
-    const dismissBtn = card.querySelector('.btn-dismiss');
-    if (dismissBtn) {
-      dismissBtn.addEventListener('click', () => {
-        acknowledgeChange(monitor.id);
-      });
-    }
+  // Add event listeners for active monitors
+  activeMonitors.forEach(monitor => {
+    setupMonitorCardListeners(monitor, false);
   });
+
+  // Add event listeners for archived monitors
+  filteredArchivedMonitors.forEach(monitor => {
+    setupMonitorCardListeners(monitor, true);
+  });
+
+  // Archived section toggle
+  const archivedHeader = document.getElementById('archivedHeader');
+  if (archivedHeader) {
+    archivedHeader.addEventListener('click', () => {
+      archivedSectionExpanded = !archivedSectionExpanded;
+      renderMonitors(monitors);
+    });
+  }
+
+  // Archived search input
+  const searchInput = document.getElementById('archivedSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const cursorPos = e.target.selectionStart;
+      archivedSearchQuery = e.target.value;
+      renderMonitors(monitors);
+      // Restore focus and cursor position after re-render
+      const newInput = document.getElementById('archivedSearchInput');
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(cursorPos, cursorPos);
+      }
+    });
+  }
 
   // Apply current filter
   applyFilter();
 }
 
-function renderMonitorCard(monitor) {
+function setupMonitorCardListeners(monitor, isArchived) {
+  const card = document.getElementById(`monitor-${monitor.id}`);
+  if (!card) return;
+
+  // Delete button
+  card.querySelector('.btn-delete').addEventListener('click', () => {
+    deleteMonitor(monitor.id);
+  });
+
+  // Archive/Unarchive button
+  const archiveBtn = card.querySelector('.btn-archive');
+  if (archiveBtn) {
+    archiveBtn.addEventListener('click', () => {
+      if (isArchived) {
+        unarchiveMonitor(monitor.id);
+      } else {
+        archiveMonitor(monitor.id);
+      }
+    });
+  }
+
+  // Check now button (only for active monitors)
+  const checkBtn = card.querySelector('.btn-check');
+  if (checkBtn) {
+    checkBtn.addEventListener('click', () => {
+      checkNow(monitor.id);
+    });
+  }
+
+  // Interval select (only for active monitors)
+  const intervalSelect = card.querySelector('.interval-select');
+  if (intervalSelect) {
+    intervalSelect.addEventListener('change', (e) => {
+      updateInterval(monitor.id, parseInt(e.target.value));
+    });
+  }
+
+  // Dismiss button (for changed monitors)
+  const dismissBtn = card.querySelector('.btn-dismiss');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+      acknowledgeChange(monitor.id);
+    });
+  }
+
+  // History toggle
+  const historyToggle = card.querySelector('.history-toggle');
+  if (historyToggle) {
+    historyToggle.addEventListener('click', () => {
+      const historyContent = card.querySelector('.history-content');
+      const toggleIcon = historyToggle.querySelector('.toggle-icon');
+      if (historyContent) {
+        historyContent.classList.toggle('expanded');
+        toggleIcon.textContent = historyContent.classList.contains('expanded') ? '▼' : '▶';
+      }
+    });
+  }
+}
+
+function renderChangeHistory(changeHistory) {
+  if (!changeHistory || changeHistory.length === 0) {
+    return '<div class="history-empty">No change history yet.</div>';
+  }
+
+  // Show history in reverse chronological order (newest first)
+  const sortedHistory = [...changeHistory].reverse();
+
+  return sortedHistory.map((entry, index) => `
+    <div class="history-entry ${index === 0 ? 'latest' : ''}">
+      <div class="history-timestamp">${formatDateTime(entry.timestamp)}</div>
+      <div class="history-value">"${escapeHtml(entry.preview || entry.content.substring(0, 100))}"</div>
+    </div>
+  `).join('');
+}
+
+function renderMonitorCard(monitor, isArchived) {
   const url = new URL(monitor.url);
   const hostname = url.hostname;
   const lastChecked = formatRelativeTime(monitor.lastChecked);
   const created = formatDate(monitor.createdAt);
   const hasChange = !!monitor.lastChangeDetected;
+  const historyCount = monitor.changeHistory ? monitor.changeHistory.length : 0;
 
   const intervalOptions = INTERVAL_OPTIONS.map(opt =>
     `<option value="${opt.value}" ${opt.value === monitor.intervalMinutes ? 'selected' : ''}>${opt.label}</option>`
   ).join('');
 
-  const changeBadge = hasChange ? `
+  const changeBadge = hasChange && !isArchived ? `
     <span class="change-badge">
       Changed ${formatRelativeTime(monitor.lastChangeDetected)}
       <button class="btn btn-dismiss">Dismiss</button>
     </span>
   ` : '';
 
+  const statusBadge = isArchived
+    ? '<span class="status-badge status-archived">Archived</span>'
+    : '<span class="status-badge status-active">Active</span>';
+
+  const archiveButtonText = isArchived ? 'Unarchive' : 'Archive';
+
   return `
-    <div class="monitor-card${hasChange ? ' changed' : ''}" id="monitor-${monitor.id}">
+    <div class="monitor-card${hasChange && !isArchived ? ' changed' : ''}${isArchived ? ' archived' : ''}" id="monitor-${monitor.id}">
       <div class="monitor-header">
         <div>
           <a href="${monitor.url}" target="_blank" class="monitor-url" title="${monitor.url}">
@@ -331,7 +483,8 @@ function renderMonitorCard(monitor) {
           ${changeBadge}
         </div>
         <div class="monitor-actions">
-          <button class="btn btn-check">Check Now</button>
+          ${!isArchived ? '<button class="btn btn-check">Check Now</button>' : ''}
+          <button class="btn btn-archive">${archiveButtonText}</button>
           <button class="btn btn-delete">Delete</button>
         </div>
       </div>
@@ -342,18 +495,44 @@ function renderMonitorCard(monitor) {
 
       ${monitor.elementPreview ? `
         <div class="monitor-preview">
-          "${escapeHtml(monitor.elementPreview)}"
+          ${monitor.previousPreview && monitor.lastChangeDetected && !isArchived ? `
+            <div class="preview-previous">
+              <span class="preview-label">Previous:</span>
+              <span class="preview-value">"${escapeHtml(monitor.previousPreview)}"</span>
+            </div>
+            <div class="preview-current">
+              <span class="preview-label">Current:</span>
+              <span class="preview-value">"${escapeHtml(monitor.elementPreview)}"</span>
+            </div>
+          ` : `
+            <div class="preview-current">
+              "${escapeHtml(monitor.elementPreview)}"
+            </div>
+          `}
         </div>
       ` : ''}
 
-      <div class="monitor-meta">
-        <div class="monitor-meta-item">
-          <span>⏱</span>
-          <span>Check every:</span>
-          <select class="interval-select">
-            ${intervalOptions}
-          </select>
+      <!-- Change History -->
+      <div class="history-section">
+        <div class="history-toggle">
+          <span class="toggle-icon">▶</span>
+          <span>Change History (${historyCount} ${historyCount === 1 ? 'entry' : 'entries'})</span>
         </div>
+        <div class="history-content">
+          ${renderChangeHistory(monitor.changeHistory)}
+        </div>
+      </div>
+
+      <div class="monitor-meta">
+        ${!isArchived ? `
+          <div class="monitor-meta-item">
+            <span>⏱</span>
+            <span>Check every:</span>
+            <select class="interval-select">
+              ${intervalOptions}
+            </select>
+          </div>
+        ` : ''}
 
         <div class="monitor-meta-item">
           <span>🕐</span>
@@ -362,7 +541,7 @@ function renderMonitorCard(monitor) {
 
         <div class="monitor-meta-item">
           <span>📊</span>
-          <span>Changes detected: ${monitor.changeCount}</span>
+          <span>Changes detected: ${monitor.changeCount || 0}</span>
         </div>
 
         <div class="monitor-meta-item">
@@ -371,7 +550,7 @@ function renderMonitorCard(monitor) {
         </div>
 
         <div class="monitor-meta-item">
-          <span class="status-badge status-active">Active</span>
+          ${statusBadge}
         </div>
       </div>
     </div>
@@ -438,6 +617,34 @@ function acknowledgeChange(id) {
   });
 }
 
+function archiveMonitor(id) {
+  chrome.runtime.sendMessage({
+    action: 'archiveMonitor',
+    id
+  }, (response) => {
+    if (response && response.success) {
+      showToast('Monitor archived', 'success');
+      loadMonitors();
+    } else {
+      showToast('Failed to archive monitor', 'error');
+    }
+  });
+}
+
+function unarchiveMonitor(id) {
+  chrome.runtime.sendMessage({
+    action: 'unarchiveMonitor',
+    id
+  }, (response) => {
+    if (response && response.success) {
+      showToast('Monitor unarchived', 'success');
+      loadMonitors();
+    } else {
+      showToast('Failed to unarchive monitor', 'error');
+    }
+  });
+}
+
 function formatRelativeTime(timestamp) {
   const now = Date.now();
   const diff = now - timestamp;
@@ -457,6 +664,17 @@ function formatDate(timestamp) {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
+  });
+}
+
+function formatDateTime(timestamp) {
+  return new Date(timestamp).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
   });
 }
 

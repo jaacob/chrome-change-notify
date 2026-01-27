@@ -167,6 +167,26 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    .btn-highlight {
+      background: #fff3e0;
+      color: #e65100;
+      border: 1px solid #ffcc80;
+    }
+
+    .btn-highlight:hover {
+      background: #ffe0b2;
+    }
+
+    .btn-highlight.active {
+      background: #e65100;
+      color: white;
+      border-color: #e65100;
+    }
+
+    .btn-highlight.active:hover {
+      background: #bf360c;
+    }
   </style>
 </head>
 <body>
@@ -176,6 +196,9 @@
     <div id="currentPageMonitors" class="monitors-section" style="display: none;">
       <div class="monitors-title">Monitors on this page</div>
       <div id="monitorsList"></div>
+      <button class="btn btn-highlight" id="highlightBtn" style="margin-top: 8px;">
+        Highlight Elements
+      </button>
     </div>
 
     <button class="btn btn-primary" id="selectBtn">

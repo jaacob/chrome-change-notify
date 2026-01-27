@@ -134,6 +134,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'acknowledgeChange':
       acknowledgeChange(message.id).then(sendResponse);
       return true;
+    case 'archiveMonitor':
+      archiveMonitor(message.id).then(sendResponse);
+      return true;
+    case 'unarchiveMonitor':
+      unarchiveMonitor(message.id).then(sendResponse);
+      return true;
   }
 });
 
@@ -143,9 +149,37 @@ async function acknowledgeChange(monitorId) {
   return { success: true };
 }
 
+// Archive a monitor (stop checking but keep all data)
+async function archiveMonitor(monitorId) {
+  await updateMonitorInStorage(monitorId, {
+    isArchived: true,
+    lastChangeDetected: null // Clear change indicator when archiving
+  });
+  // Remove the alarm so it stops checking
+  await chrome.alarms.clear(`monitor_${monitorId}`);
+  return { success: true };
+}
+
+// Unarchive a monitor (resume checking)
+async function unarchiveMonitor(monitorId) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+
+  if (!monitor) {
+    return { success: false, error: 'Monitor not found' };
+  }
+
+  await updateMonitorInStorage(monitorId, { isArchived: false });
+  // Reschedule the alarm
+  scheduleMonitor(monitor);
+  return { success: true };
+}
+
 // Check all monitors sequentially with progress reporting
 async function checkAllMonitors() {
-  const monitors = await getMonitors();
+  const allMonitors = await getMonitors();
+  // Only check active (non-archived) monitors
+  const monitors = allMonitors.filter(m => !m.isArchived);
 
   if (monitors.length === 0) {
     return { success: true, total: 0, changedCount: 0 };
@@ -264,7 +298,14 @@ async function addMonitor(data) {
     createdAt: Date.now(),
     changeCount: 0,
     // Default to dynamic (JS-rendered) - safer assumption for modern web
-    isDynamic: data.isDynamic !== false
+    isDynamic: data.isDynamic !== false,
+    isArchived: false,
+    // Initialize change history with the initial content
+    changeHistory: [{
+      timestamp: Date.now(),
+      content: data.currentContent,
+      preview: data.elementPreview
+    }]
   };
 
   monitors.push(monitor);
@@ -334,6 +375,9 @@ async function updateMonitorInStorage(monitorId, updates) {
 // ============================================================================
 
 function scheduleMonitor(monitor, delayMinutes = 0) {
+  // Don't schedule archived monitors
+  if (monitor.isArchived) return;
+
   chrome.alarms.create(`monitor_${monitor.id}`, {
     delayInMinutes: delayMinutes || monitor.intervalMinutes,
     periodInMinutes: monitor.intervalMinutes
@@ -342,11 +386,13 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
 
 async function scheduleAllMonitors() {
   const monitors = await getMonitors();
+  // Filter out archived monitors
+  const activeMonitors = monitors.filter(m => !m.isArchived);
   // Stagger initial checks to prevent stampede after wake/restart
-  const staggerMinutes = Math.max(0.1, Math.min(1, monitors.length / 10));
+  const staggerMinutes = Math.max(0.1, Math.min(1, activeMonitors.length / 10));
 
-  for (let i = 0; i < monitors.length; i++) {
-    scheduleMonitor(monitors[i], i * staggerMinutes);
+  for (let i = 0; i < activeMonitors.length; i++) {
+    scheduleMonitor(activeMonitors[i], i * staggerMinutes);
   }
 }
 
@@ -458,19 +504,38 @@ async function checkForChanges(monitorId) {
 
     const updates = { lastChecked: Date.now() };
     if (changed) {
+      const newPreview = currentContent.substring(0, 100) +
+        (currentContent.length > 100 ? '...' : '');
+      // Save previous content before overwriting
+      updates.previousContent = monitor.lastContent;
+      updates.previousPreview = monitor.elementPreview;
+      // Update to new content
       updates.lastContent = currentContent;
       updates.changeCount = (monitor.changeCount || 0) + 1;
-      updates.elementPreview = currentContent.substring(0, 100) +
-        (currentContent.length > 100 ? '...' : '');
+      updates.elementPreview = newPreview;
       updates.lastChangeDetected = Date.now();
+      // Add to change history
+      const changeHistory = monitor.changeHistory || [];
+      changeHistory.push({
+        timestamp: Date.now(),
+        content: currentContent,
+        preview: newPreview
+      });
+      updates.changeHistory = changeHistory;
     }
     await updateMonitorInStorage(monitorId, updates);
 
     if (changed) {
+      const url = new URL(monitor.url);
+      const displayUrl = url.hostname + (url.pathname !== '/' ? url.pathname : '');
+      // Truncate content for notification (keep it readable)
+      const notificationContent = currentContent.length > 150
+        ? currentContent.substring(0, 150) + '...'
+        : currentContent;
       await showNotification(
         monitor,
-        'Content Changed!',
-        `Change detected on ${new URL(monitor.url).hostname}`
+        `Change on ${displayUrl}`,
+        notificationContent
       );
     }
 

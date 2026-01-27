@@ -1,7 +1,11 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const selectBtn = document.getElementById('selectBtn');
   const manageBtn = document.getElementById('manageBtn');
+  const highlightBtn = document.getElementById('highlightBtn');
   const status = document.getElementById('status');
+
+  let isHighlighting = false;
+  let currentPageMonitors = [];
 
   // Update status with monitor count and show current page monitors
   await updateStatus();
@@ -59,6 +63,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     chrome.runtime.openOptionsPage();
   });
 
+  highlightBtn.addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+
+    isHighlighting = !isHighlighting;
+
+    if (isHighlighting) {
+      highlightBtn.textContent = 'Hide Highlights';
+      highlightBtn.classList.add('active');
+
+      // Send monitors to content script for highlighting
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'highlightMonitors',
+          monitors: currentPageMonitors
+        });
+      } catch (error) {
+        // Content script might not be loaded, try injecting it
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+          await chrome.scripting.insertCSS({
+            target: { tabId: tab.id },
+            files: ['content.css']
+          });
+          await chrome.tabs.sendMessage(tab.id, {
+            action: 'highlightMonitors',
+            monitors: currentPageMonitors
+          });
+        } catch (e) {
+          console.error('Failed to highlight:', e);
+        }
+      }
+    } else {
+      highlightBtn.textContent = 'Highlight Elements';
+      highlightBtn.classList.remove('active');
+
+      // Tell content script to remove highlights
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: 'unhighlightMonitors' });
+      } catch (error) {
+        // Ignore errors
+      }
+    }
+  });
+
   async function updateStatus() {
     // Get current tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -67,16 +119,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const result = await chrome.storage.local.get(['monitors']);
     const allMonitors = result.monitors || [];
 
-    // Update total count
-    const count = allMonitors.length;
+    // Update total count (only active, non-archived monitors)
+    const activeMonitors = allMonitors.filter(m => !m.isArchived);
+    const count = activeMonitors.length;
     status.innerHTML = `Monitoring <strong>${count}</strong> element${count !== 1 ? 's' : ''} total`;
 
     // Show monitors for current page if any
     if (tab && tab.url) {
-      const pageMonitors = allMonitors.filter(m => m.url === tab.url);
+      currentPageMonitors = allMonitors.filter(m => m.url === tab.url && !m.isArchived);
 
-      if (pageMonitors.length > 0) {
-        displayCurrentPageMonitors(pageMonitors);
+      if (currentPageMonitors.length > 0) {
+        displayCurrentPageMonitors(currentPageMonitors);
       }
     }
   }

@@ -4,6 +4,19 @@ let selectionMode = false;
 let highlightedElement = null;
 let overlay = null;
 let tooltip = null;
+let monitorHighlights = []; // Track highlight overlays
+
+// Color palette for highlighting multiple monitors
+const HIGHLIGHT_COLORS = [
+  '#e53935', // red
+  '#8e24aa', // purple
+  '#1e88e5', // blue
+  '#43a047', // green
+  '#fb8c00', // orange
+  '#00acc1', // cyan
+  '#d81b60', // pink
+  '#5e35b1', // deep purple
+];
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -12,6 +25,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   } else if (message.action === 'cancelSelection') {
     cancelSelectionMode();
+    sendResponse({ success: true });
+  } else if (message.action === 'highlightMonitors') {
+    highlightMonitors(message.monitors);
+    sendResponse({ success: true });
+  } else if (message.action === 'unhighlightMonitors') {
+    unhighlightMonitors();
     sendResponse({ success: true });
   }
   return true;
@@ -223,4 +242,125 @@ function showSuccessMessage() {
     msg.classList.add('fade-out');
     setTimeout(() => msg.remove(), 300);
   }, 2000);
+}
+
+// ============================================================================
+// MONITOR HIGHLIGHTING
+// ============================================================================
+
+function highlightMonitors(monitors) {
+  // Remove any existing highlights first
+  unhighlightMonitors();
+
+  monitors.forEach((monitor, index) => {
+    const color = HIGHLIGHT_COLORS[index % HIGHLIGHT_COLORS.length];
+    const element = findMonitoredElement(monitor);
+
+    if (element) {
+      createHighlightOverlay(element, monitor, color, index + 1);
+    }
+  });
+}
+
+function unhighlightMonitors() {
+  monitorHighlights.forEach(highlight => {
+    // Remove event listeners
+    if (highlight.overlay && highlight.overlay._updatePosition) {
+      window.removeEventListener('scroll', highlight.overlay._updatePosition, true);
+      window.removeEventListener('resize', highlight.overlay._updatePosition);
+    }
+    if (highlight.overlay) highlight.overlay.remove();
+    if (highlight.label) highlight.label.remove();
+  });
+  monitorHighlights = [];
+}
+
+function findMonitoredElement(monitor) {
+  // Try selector first
+  if (monitor.selector) {
+    const element = document.querySelector(monitor.selector);
+    if (element) return element;
+  }
+
+  // Fall back to selectorPath
+  if (monitor.selectorPath) {
+    return getElementByPath(monitor.selectorPath);
+  }
+
+  return null;
+}
+
+function getElementByPath(path) {
+  let current = document.body;
+  if (!current) return null;
+
+  for (const index of path) {
+    if (!current.children) return null;
+    const children = Array.from(current.children);
+    if (index >= children.length) return null;
+    current = children[index];
+  }
+  return current;
+}
+
+function createHighlightOverlay(element, monitor, color, number) {
+  const rect = element.getBoundingClientRect();
+
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'dom-monitor-highlight-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: ${rect.top}px;
+    left: ${rect.left}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+    border: 3px solid ${color};
+    background: ${color}20;
+    pointer-events: none;
+    z-index: 2147483646;
+    box-sizing: border-box;
+  `;
+
+  // Create label
+  const label = document.createElement('div');
+  label.className = 'dom-monitor-highlight-label';
+  label.style.cssText = `
+    position: fixed;
+    top: ${Math.max(0, rect.top - 28)}px;
+    left: ${rect.left}px;
+    background: ${color};
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 2147483647;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  `;
+  label.textContent = `#${number}: ${monitor.selector || 'Element'}`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(label);
+
+  monitorHighlights.push({ overlay, label, element });
+
+  // Update position on scroll/resize
+  const updatePosition = () => {
+    const newRect = element.getBoundingClientRect();
+    overlay.style.top = `${newRect.top}px`;
+    overlay.style.left = `${newRect.left}px`;
+    overlay.style.width = `${newRect.width}px`;
+    overlay.style.height = `${newRect.height}px`;
+    label.style.top = `${Math.max(0, newRect.top - 28)}px`;
+    label.style.left = `${newRect.left}px`;
+  };
+
+  // Store the update function so we can remove it later
+  overlay._updatePosition = updatePosition;
+  window.addEventListener('scroll', updatePosition, true);
+  window.addEventListener('resize', updatePosition);
 }

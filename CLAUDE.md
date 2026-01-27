@@ -95,13 +95,21 @@ The check flow is:
     selector: string,
     selectorPath: number[],
     elementPreview: string,
+    previousPreview: string | null,    // preview before last change (for showing delta)
     intervalMinutes: number,
     lastContent: string,
+    previousContent: string | null,    // content before last change
     lastChecked: number,
     createdAt: number,
     changeCount: number,
     isDynamic: boolean,
-    lastChangeDetected: number | null  // timestamp when change was detected, null after acknowledged
+    isArchived: boolean,               // true = monitor is archived (no checking, data preserved)
+    lastChangeDetected: number | null, // timestamp when change was detected, null after acknowledged
+    changeHistory: [{                  // full history of all changes
+      timestamp: number,
+      content: string,
+      preview: string
+    }]
   }],
   stickyWindowId: number | null,
   checkAllProgress: {
@@ -124,7 +132,10 @@ When making changes, verify:
 - [ ] Service worker restart doesn't break sticky window reuse
 - [ ] Deleting all monitors closes the sticky window
 - [ ] Badge shows correct count on monitored pages
-- [ ] Notifications appear on macOS
+- [ ] Notifications appear on macOS (with new content shown)
+- [ ] Change history is recorded and displays correctly
+- [ ] Archive/unarchive works (archived monitors stop checking)
+- [ ] Archived section expands/collapses with search filtering
 
 ## User Preferences
 
