@@ -440,13 +440,205 @@ function renderChangeHistory(changeHistory) {
   // Show history in reverse chronological order (newest first)
   const sortedHistory = [...changeHistory].reverse();
 
-  return sortedHistory.map((entry, index) => `
-    <div class="history-entry ${index === 0 ? 'latest' : ''}">
-      <div class="history-timestamp">${formatDateTime(entry.timestamp)}</div>
-      <div class="history-value">"${escapeHtml(entry.preview || entry.content.substring(0, 100))}"</div>
-    </div>
-  `).join('');
+  return sortedHistory.map((entry, index) => {
+    // The entry at sortedHistory[index] corresponds to changeHistory in reverse.
+    // To find the predecessor, we need the chronologically previous entry.
+    const chronoIndex = changeHistory.length - 1 - index;
+    const prevEntry = chronoIndex > 0 ? changeHistory[chronoIndex - 1] : null;
+
+    let valueHtml;
+    if (prevEntry && prevEntry.content && entry.content) {
+      valueHtml = `<div class="history-diff">${renderInlineDiff(prevEntry.content, entry.content)}</div>`;
+    } else {
+      valueHtml = `<div class="history-value">"${escapeHtml(entry.preview || entry.content.substring(0, 100))}"</div>`;
+    }
+
+    return `
+      <div class="history-entry ${index === 0 ? 'latest' : ''}">
+        <div class="history-timestamp">${formatDateTime(entry.timestamp)}</div>
+        ${valueHtml}
+      </div>
+    `;
+  }).join('');
 }
+
+// --- Word-level diff utilities ---
+
+function tokenizeWords(text) {
+  return text.split(/(\s+)/).filter(t => t.length > 0);
+}
+
+function computeWordDiff(oldText, newText) {
+  const oldTokens = tokenizeWords(oldText);
+  const newTokens = tokenizeWords(newText);
+
+  // Trim common prefix and suffix to reduce DP matrix size
+  let prefixLen = 0;
+  while (prefixLen < oldTokens.length && prefixLen < newTokens.length &&
+         oldTokens[prefixLen] === newTokens[prefixLen]) {
+    prefixLen++;
+  }
+
+  let suffixLen = 0;
+  while (suffixLen < (oldTokens.length - prefixLen) &&
+         suffixLen < (newTokens.length - prefixLen) &&
+         oldTokens[oldTokens.length - 1 - suffixLen] === newTokens[newTokens.length - 1 - suffixLen]) {
+    suffixLen++;
+  }
+
+  const oldMiddle = oldTokens.slice(prefixLen, oldTokens.length - suffixLen);
+  const newMiddle = newTokens.slice(prefixLen, newTokens.length - suffixLen);
+
+  // LCS on the middle portion
+  const ops = [];
+
+  // Add common prefix
+  for (let i = 0; i < prefixLen; i++) {
+    ops.push({ type: 'equal', text: oldTokens[i] });
+  }
+
+  if (oldMiddle.length === 0 && newMiddle.length === 0) {
+    // No changes in the middle
+  } else if (oldMiddle.length * newMiddle.length > 4000000) {
+    // Too large for DP — treat entire middle as remove+add
+    if (oldMiddle.length > 0) {
+      ops.push({ type: 'remove', text: oldMiddle.join('') });
+    }
+    if (newMiddle.length > 0) {
+      ops.push({ type: 'add', text: newMiddle.join('') });
+    }
+  } else {
+    // Standard DP LCS
+    const m = oldMiddle.length;
+    const n = newMiddle.length;
+    const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (oldMiddle[i - 1] === newMiddle[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+      }
+    }
+
+    // Backtrack to produce ops
+    const middleOps = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldMiddle[i - 1] === newMiddle[j - 1]) {
+        middleOps.push({ type: 'equal', text: oldMiddle[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        middleOps.push({ type: 'add', text: newMiddle[j - 1] });
+        j--;
+      } else {
+        middleOps.push({ type: 'remove', text: oldMiddle[i - 1] });
+        i--;
+      }
+    }
+    middleOps.reverse();
+
+    // Merge consecutive ops of the same type
+    for (const op of middleOps) {
+      const last = ops[ops.length - 1];
+      if (last && last.type === op.type) {
+        last.text += op.text;
+      } else {
+        ops.push({ type: op.type, text: op.text });
+      }
+    }
+  }
+
+  // Add common suffix
+  for (let i = oldTokens.length - suffixLen; i < oldTokens.length; i++) {
+    const last = ops[ops.length - 1];
+    if (last && last.type === 'equal') {
+      last.text += oldTokens[i];
+    } else {
+      ops.push({ type: 'equal', text: oldTokens[i] });
+    }
+  }
+
+  return ops;
+}
+
+function extractDiffContext(ops, contextWords) {
+  if (contextWords === undefined) contextWords = 8;
+
+  // Find which ops contain changes
+  const changeIndices = [];
+  ops.forEach((op, i) => {
+    if (op.type !== 'equal') changeIndices.push(i);
+  });
+
+  if (changeIndices.length === 0) return ops;
+
+  // For each equal op, decide if it should be kept, trimmed, or replaced with ellipsis
+  const result = [];
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i].type !== 'equal') {
+      result.push(ops[i]);
+      continue;
+    }
+
+    // Find distance to nearest change
+    const prevChange = changeIndices.filter(ci => ci < i);
+    const nextChange = changeIndices.filter(ci => ci > i);
+    const distPrev = prevChange.length > 0 ? i - prevChange[prevChange.length - 1] : Infinity;
+    const distNext = nextChange.length > 0 ? nextChange[0] - i : Infinity;
+
+    const words = ops[i].text.split(/(\s+)/).filter(t => t.length > 0);
+
+    // Keep contextWords from the end (if near a following change) and start (if near a preceding change)
+    let keepStart = distPrev <= 1 ? contextWords * 2 : 0; // words to keep from beginning
+    let keepEnd = distNext <= 1 ? contextWords * 2 : 0;   // words to keep from end
+
+    if (keepStart + keepEnd >= words.length) {
+      // Keep entire block
+      result.push(ops[i]);
+    } else {
+      // Trim and add ellipsis
+      if (keepStart > 0) {
+        result.push({ type: 'equal', text: words.slice(0, keepStart).join('') });
+      }
+      result.push({ type: 'ellipsis' });
+      if (keepEnd > 0) {
+        result.push({ type: 'equal', text: words.slice(words.length - keepEnd).join('') });
+      }
+    }
+  }
+
+  // Collapse adjacent ellipses
+  const collapsed = [];
+  for (const op of result) {
+    if (op.type === 'ellipsis' && collapsed.length > 0 && collapsed[collapsed.length - 1].type === 'ellipsis') {
+      continue;
+    }
+    collapsed.push(op);
+  }
+
+  return collapsed;
+}
+
+function renderDiffHtml(ops) {
+  return ops.map(op => {
+    if (op.type === 'equal') return `<span class="diff-equal">${escapeHtml(op.text)}</span>`;
+    if (op.type === 'add') return `<span class="diff-add">${escapeHtml(op.text)}</span>`;
+    if (op.type === 'remove') return `<span class="diff-remove">${escapeHtml(op.text)}</span>`;
+    if (op.type === 'ellipsis') return `<span class="diff-ellipsis"> ... </span>`;
+    return '';
+  }).join('');
+}
+
+function renderInlineDiff(oldText, newText) {
+  const ops = computeWordDiff(oldText, newText);
+  const contextOps = extractDiffContext(ops);
+  return renderDiffHtml(contextOps);
+}
+
+// --- End diff utilities ---
 
 function renderMonitorCard(monitor, isArchived) {
   const url = new URL(monitor.url);
@@ -493,22 +685,15 @@ function renderMonitorCard(monitor, isArchived) {
         ${escapeHtml(monitor.selector)}
       </div>
 
-      ${monitor.elementPreview ? `
+      ${monitor.previousContent && monitor.lastContent && monitor.lastChangeDetected && !isArchived ? `
+        <div class="diff-container">
+          ${renderInlineDiff(monitor.previousContent, monitor.lastContent)}
+        </div>
+      ` : monitor.elementPreview ? `
         <div class="monitor-preview">
-          ${monitor.previousPreview && monitor.lastChangeDetected && !isArchived ? `
-            <div class="preview-previous">
-              <span class="preview-label">Previous:</span>
-              <span class="preview-value">"${escapeHtml(monitor.previousPreview)}"</span>
-            </div>
-            <div class="preview-current">
-              <span class="preview-label">Current:</span>
-              <span class="preview-value">"${escapeHtml(monitor.elementPreview)}"</span>
-            </div>
-          ` : `
-            <div class="preview-current">
-              "${escapeHtml(monitor.elementPreview)}"
-            </div>
-          `}
+          <div class="preview-current">
+            "${escapeHtml(monitor.elementPreview)}"
+          </div>
         </div>
       ` : ''}
 

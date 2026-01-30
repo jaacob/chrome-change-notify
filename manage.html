@@ -209,6 +209,54 @@
       color: #1a73e8;
     }
 
+    /* Inline diff styles */
+    .diff-container {
+      font-size: 13px;
+      color: #3c4043;
+      padding: 12px;
+      background: #fafafa;
+      border-left: 3px solid #4285f4;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 16px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .diff-equal {
+      color: #3c4043;
+    }
+
+    .diff-add {
+      background: #e6ffec;
+      color: #1a7f37;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    .diff-remove {
+      background: #ffebe9;
+      color: #cf222e;
+      text-decoration: line-through;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    .diff-ellipsis {
+      color: #9aa0a6;
+      font-style: italic;
+    }
+
+    .history-diff {
+      font-size: 12px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .history-diff .diff-add,
+    .history-diff .diff-remove {
+      padding: 0 2px;
+    }
+
     .monitor-meta {
       display: flex;
       gap: 24px;
