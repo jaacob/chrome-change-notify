@@ -921,7 +921,9 @@ function setExpiration(id, expiresAt) {
 }
 
 function isMonitorExpired(monitor) {
-  return monitor.expiresAt && Date.now() >= monitor.expiresAt;
+  // 1-hour grace period: monitor is still "active" for 1 hour after expiration
+  const EXPIRATION_CHECK_GRACE = 60 * 60 * 1000;
+  return monitor.expiresAt && Date.now() >= monitor.expiresAt + EXPIRATION_CHECK_GRACE;
 }
 
 function formatDateTimeCT(timestamp) {

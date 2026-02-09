@@ -4,6 +4,7 @@
 const DEFAULT_INTERVAL = 60; // 60 minutes = 1 hour
 const CHECK_TIMEOUT = 30000; // 30 second timeout for page load
 const JS_RENDER_DELAY = 2000; // Wait for JS to render after page load
+const EXPIRATION_CHECK_GRACE = 60 * 60 * 1000; // Keep checking for 1 hour after expiration
 const EXPIRATION_ARCHIVE_DELAY = 24 * 60 * 60 * 1000; // Auto-archive 24 hours after expiration
 
 // Queue for sequential processing
@@ -199,8 +200,8 @@ async function setExpiration(monitorId, expiresAt) {
   if (expiresAt && Date.now() >= expiresAt + EXPIRATION_ARCHIVE_DELAY) {
     // Expired 24+ hours ago - auto-archive
     await archiveMonitor(monitorId);
-  } else if (expiresAt && Date.now() >= expiresAt) {
-    // Expired but within 24h grace period - just clear the alarm
+  } else if (expiresAt && Date.now() >= expiresAt + EXPIRATION_CHECK_GRACE) {
+    // Past 1h grace period but within 24h - stop checking but don't archive
     await chrome.alarms.clear(`monitor_${monitorId}`);
   } else {
     // Clear existing alarm and reschedule (scheduleMonitor checks expiration)
@@ -219,7 +220,7 @@ async function setExpiration(monitorId, expiresAt) {
 async function checkAllMonitors() {
   const allMonitors = await getMonitors();
   // Only check active (non-archived, non-expired) monitors
-  const monitors = allMonitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt));
+  const monitors = allMonitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt + EXPIRATION_CHECK_GRACE));
 
   if (monitors.length === 0) {
     return { success: true, total: 0, changedCount: 0 };
@@ -419,7 +420,7 @@ async function updateMonitorInStorage(monitorId, updates) {
 function scheduleMonitor(monitor, delayMinutes = 0) {
   // Don't schedule archived or expired monitors
   if (monitor.isArchived) return;
-  if (monitor.expiresAt && Date.now() >= monitor.expiresAt) return;
+  if (monitor.expiresAt && Date.now() >= monitor.expiresAt + EXPIRATION_CHECK_GRACE) return;
 
   chrome.alarms.create(`monitor_${monitor.id}`, {
     delayInMinutes: delayMinutes || monitor.intervalMinutes,
@@ -430,7 +431,7 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
 async function scheduleAllMonitors() {
   const monitors = await getMonitors();
   // Filter out archived and expired monitors
-  const activeMonitors = monitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt));
+  const activeMonitors = monitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt + EXPIRATION_CHECK_GRACE));
   // Stagger initial checks to prevent stampede after wake/restart
   const staggerMinutes = Math.max(0.1, Math.min(1, activeMonitors.length / 10));
 
@@ -521,8 +522,8 @@ async function checkForChanges(monitorId) {
     return { success: false, error: 'Monitor not found' };
   }
 
-  // Handle expired monitors
-  if (monitor.expiresAt && Date.now() >= monitor.expiresAt) {
+  // Handle expired monitors (1-hour grace period for checking, then stop)
+  if (monitor.expiresAt && Date.now() >= monitor.expiresAt + EXPIRATION_CHECK_GRACE) {
     if (Date.now() >= monitor.expiresAt + EXPIRATION_ARCHIVE_DELAY && !monitor.isArchived) {
       // 24+ hours past expiration - auto-archive
       await updateMonitorInStorage(monitorId, {
@@ -531,7 +532,7 @@ async function checkForChanges(monitorId) {
       });
       await chrome.alarms.clear(`monitor_${monitorId}`);
     }
-    // Either way, skip the check
+    // Past grace period, skip the check
     return { success: true, changed: false, expired: true };
   }
 
