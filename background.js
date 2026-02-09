@@ -140,6 +140,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'unarchiveMonitor':
       unarchiveMonitor(message.id).then(sendResponse);
       return true;
+    case 'toggleStar':
+      toggleStar(message.id).then(sendResponse);
+      return true;
+    case 'setExpiration':
+      setExpiration(message.id, message.expiresAt).then(sendResponse);
+      return true;
   }
 });
 
@@ -175,11 +181,41 @@ async function unarchiveMonitor(monitorId) {
   return { success: true };
 }
 
+// Toggle starred status on a monitor
+async function toggleStar(monitorId) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+  if (!monitor) return { success: false, error: 'Monitor not found' };
+
+  await updateMonitorInStorage(monitorId, { isStarred: !monitor.isStarred });
+  return { success: true, isStarred: !monitor.isStarred };
+}
+
+// Set or clear expiration on a monitor
+async function setExpiration(monitorId, expiresAt) {
+  await updateMonitorInStorage(monitorId, { expiresAt: expiresAt || null });
+
+  if (expiresAt && Date.now() >= expiresAt) {
+    // Already expired - auto-archive immediately
+    await archiveMonitor(monitorId);
+  } else {
+    // Clear existing alarm and reschedule (scheduleMonitor checks expiration)
+    await chrome.alarms.clear(`monitor_${monitorId}`);
+    const monitors = await getMonitors();
+    const monitor = monitors.find(m => m.id === monitorId);
+    if (monitor && !monitor.isArchived) {
+      scheduleMonitor(monitor);
+    }
+  }
+
+  return { success: true };
+}
+
 // Check all monitors sequentially with progress reporting
 async function checkAllMonitors() {
   const allMonitors = await getMonitors();
-  // Only check active (non-archived) monitors
-  const monitors = allMonitors.filter(m => !m.isArchived);
+  // Only check active (non-archived, non-expired) monitors
+  const monitors = allMonitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt));
 
   if (monitors.length === 0) {
     return { success: true, total: 0, changedCount: 0 };
@@ -300,6 +336,8 @@ async function addMonitor(data) {
     // Default to dynamic (JS-rendered) - safer assumption for modern web
     isDynamic: data.isDynamic !== false,
     isArchived: false,
+    isStarred: false,
+    expiresAt: null,
     // Initialize change history with the initial content
     changeHistory: [{
       timestamp: Date.now(),
@@ -375,8 +413,9 @@ async function updateMonitorInStorage(monitorId, updates) {
 // ============================================================================
 
 function scheduleMonitor(monitor, delayMinutes = 0) {
-  // Don't schedule archived monitors
+  // Don't schedule archived or expired monitors
   if (monitor.isArchived) return;
+  if (monitor.expiresAt && Date.now() >= monitor.expiresAt) return;
 
   chrome.alarms.create(`monitor_${monitor.id}`, {
     delayInMinutes: delayMinutes || monitor.intervalMinutes,
@@ -386,8 +425,8 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
 
 async function scheduleAllMonitors() {
   const monitors = await getMonitors();
-  // Filter out archived monitors
-  const activeMonitors = monitors.filter(m => !m.isArchived);
+  // Filter out archived and expired monitors
+  const activeMonitors = monitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt));
   // Stagger initial checks to prevent stampede after wake/restart
   const staggerMinutes = Math.max(0.1, Math.min(1, activeMonitors.length / 10));
 
@@ -476,6 +515,18 @@ async function checkForChanges(monitorId) {
 
   if (!monitor) {
     return { success: false, error: 'Monitor not found' };
+  }
+
+  // Auto-archive expired monitors
+  if (monitor.expiresAt && Date.now() >= monitor.expiresAt) {
+    if (!monitor.isArchived) {
+      await updateMonitorInStorage(monitorId, {
+        isArchived: true,
+        lastChangeDetected: null
+      });
+      await chrome.alarms.clear(`monitor_${monitorId}`);
+    }
+    return { success: true, changed: false, expired: true };
   }
 
   try {

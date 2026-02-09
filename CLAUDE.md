@@ -104,6 +104,8 @@ The check flow is:
     changeCount: number,
     isDynamic: boolean,
     isArchived: boolean,               // true = monitor is archived (no checking, data preserved)
+    isStarred: boolean,                // true = monitor is starred (sorts to top of list)
+    expiresAt: number | null,          // timestamp (ms) when monitor expires and auto-archives, null = no expiration
     lastChangeDetected: number | null, // timestamp when change was detected, null after acknowledged
     changeHistory: [{                  // full history of all changes
       timestamp: number,
@@ -136,6 +138,10 @@ When making changes, verify:
 - [ ] Change history is recorded and displays correctly
 - [ ] Archive/unarchive works (archived monitors stop checking)
 - [ ] Archived section expands/collapses with search filtering
+- [ ] Star/unstar works and starred monitors sort to top
+- [ ] Expiration datetime can be set, cleared, and displays in Central Time
+- [ ] Expired monitors auto-archive and stop checking
+- [ ] Expiration countdown updates in real-time
 
 ## User Preferences
 

@@ -231,6 +231,16 @@ function updateTimestamps() {
       if (lastCheckedEl) {
         lastCheckedEl.textContent = `Last checked: ${formatRelativeTime(monitor.lastChecked)}`;
       }
+      // Update expiration countdown
+      const expirationBadge = card.querySelector('.expiration-badge');
+      if (expirationBadge && monitor.expiresAt) {
+        if (isMonitorExpired(monitor)) {
+          expirationBadge.className = 'expiration-badge expired';
+          expirationBadge.textContent = `Expired ${formatDateTimeCT(monitor.expiresAt)}`;
+        } else {
+          expirationBadge.textContent = `Expires: ${formatDateTimeCT(monitor.expiresAt)} (${formatCountdown(monitor.expiresAt)})`;
+        }
+      }
     }
   });
 }
@@ -260,9 +270,11 @@ function renderMonitors(monitors) {
   const content = document.getElementById('content');
   const checkAllBtn = document.getElementById('checkAllBtn');
 
-  // Separate active and archived monitors
+  // Separate active and archived monitors, sort starred to top
   const activeMonitors = monitors.filter(m => !m.isArchived);
+  activeMonitors.sort((a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0));
   const archivedMonitors = monitors.filter(m => m.isArchived);
+  archivedMonitors.sort((a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0));
 
   // Filter archived monitors by search query
   const filteredArchivedMonitors = archivedMonitors.filter(m => {
@@ -377,6 +389,14 @@ function setupMonitorCardListeners(monitor, isArchived) {
   const card = document.getElementById(`monitor-${monitor.id}`);
   if (!card) return;
 
+  // Star button
+  const starBtn = card.querySelector('.btn-star');
+  if (starBtn) {
+    starBtn.addEventListener('click', () => {
+      toggleStar(monitor.id);
+    });
+  }
+
   // Delete button
   card.querySelector('.btn-delete').addEventListener('click', () => {
     deleteMonitor(monitor.id);
@@ -415,6 +435,23 @@ function setupMonitorCardListeners(monitor, isArchived) {
   if (dismissBtn) {
     dismissBtn.addEventListener('click', () => {
       acknowledgeChange(monitor.id);
+    });
+  }
+
+  // Expiration input
+  const expirationInput = card.querySelector('.expiration-input');
+  if (expirationInput) {
+    expirationInput.addEventListener('change', (e) => {
+      const expiresAt = parseDatetimeLocalAsCT(e.target.value);
+      setExpiration(monitor.id, expiresAt);
+    });
+  }
+
+  // Clear expiration button
+  const clearExpirationBtn = card.querySelector('.btn-clear-expiration');
+  if (clearExpirationBtn) {
+    clearExpirationBtn.addEventListener('click', () => {
+      setExpiration(monitor.id, null);
     });
   }
 
@@ -646,6 +683,7 @@ function renderMonitorCard(monitor, isArchived) {
   const lastChecked = formatRelativeTime(monitor.lastChecked);
   const created = formatDate(monitor.createdAt);
   const hasChange = !!monitor.lastChangeDetected;
+  const expired = isMonitorExpired(monitor);
   const historyCount = monitor.changeHistory ? monitor.changeHistory.length : 0;
 
   const intervalOptions = INTERVAL_OPTIONS.map(opt =>
@@ -659,9 +697,23 @@ function renderMonitorCard(monitor, isArchived) {
     </span>
   ` : '';
 
+  const expirationBadge = monitor.expiresAt ? (
+    expired
+      ? `<span class="expiration-badge expired">Expired ${formatDateTimeCT(monitor.expiresAt)}</span>`
+      : `<span class="expiration-badge active" data-expires-at="${monitor.expiresAt}">Expires: ${formatDateTimeCT(monitor.expiresAt)} (${formatCountdown(monitor.expiresAt)})</span>`
+  ) : '';
+
   const statusBadge = isArchived
     ? '<span class="status-badge status-archived">Archived</span>'
-    : '<span class="status-badge status-active">Active</span>';
+    : expired
+      ? '<span class="status-badge status-expired">Expired</span>'
+      : '<span class="status-badge status-active">Active</span>';
+
+  const starButton = `
+    <button class="btn-star ${monitor.isStarred ? 'starred' : ''}" title="${monitor.isStarred ? 'Unstar' : 'Star'} this monitor">
+      ${monitor.isStarred ? '★' : '☆'}
+    </button>
+  `;
 
   const archiveButtonText = isArchived ? 'Unarchive' : 'Archive';
 
@@ -669,13 +721,15 @@ function renderMonitorCard(monitor, isArchived) {
     <div class="monitor-card${hasChange && !isArchived ? ' changed' : ''}${isArchived ? ' archived' : ''}" id="monitor-${monitor.id}">
       <div class="monitor-header">
         <div>
+          ${starButton}
           <a href="${monitor.url}" target="_blank" class="monitor-url" title="${monitor.url}">
             ${hostname}${url.pathname !== '/' ? url.pathname : ''}
           </a>
           ${changeBadge}
+          ${expirationBadge}
         </div>
         <div class="monitor-actions">
-          ${!isArchived ? '<button class="btn btn-check">Check Now</button>' : ''}
+          ${!isArchived && !expired ? '<button class="btn btn-check">Check Now</button>' : ''}
           <button class="btn btn-archive">${archiveButtonText}</button>
           <button class="btn btn-delete">Delete</button>
         </div>
@@ -709,13 +763,22 @@ function renderMonitorCard(monitor, isArchived) {
       </div>
 
       <div class="monitor-meta">
-        ${!isArchived ? `
+        ${!isArchived && !expired ? `
           <div class="monitor-meta-item">
             <span>⏱</span>
             <span>Check every:</span>
             <select class="interval-select">
               ${intervalOptions}
             </select>
+          </div>
+        ` : ''}
+
+        ${!isArchived ? `
+          <div class="monitor-meta-item">
+            <span>⏰</span>
+            <span>Expires:</span>
+            <input type="datetime-local" class="expiration-input" value="${timestampToDatetimeLocalCT(monitor.expiresAt)}">
+            ${monitor.expiresAt ? '<button class="btn-clear-expiration" title="Clear expiration">✕</button>' : ''}
           </div>
         ` : ''}
 
@@ -828,6 +891,89 @@ function unarchiveMonitor(id) {
       showToast('Failed to unarchive monitor', 'error');
     }
   });
+}
+
+function toggleStar(id) {
+  chrome.runtime.sendMessage({ action: 'toggleStar', id }, (response) => {
+    if (response && response.success) {
+      loadMonitors();
+    }
+  });
+}
+
+function setExpiration(id, expiresAt) {
+  chrome.runtime.sendMessage({
+    action: 'setExpiration',
+    id,
+    expiresAt
+  }, (response) => {
+    if (response && response.success) {
+      if (expiresAt) {
+        showToast('Expiration set', 'success');
+      } else {
+        showToast('Expiration cleared', 'success');
+      }
+      loadMonitors();
+    } else {
+      showToast('Failed to set expiration', 'error');
+    }
+  });
+}
+
+function isMonitorExpired(monitor) {
+  return monitor.expiresAt && Date.now() >= monitor.expiresAt;
+}
+
+function formatDateTimeCT(timestamp) {
+  if (!timestamp) return '';
+  return new Date(timestamp).toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }) + ' CT';
+}
+
+function formatCountdown(expiresAt) {
+  if (!expiresAt) return '';
+  const diff = expiresAt - Date.now();
+  if (diff <= 0) return 'Expired';
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (days > 0) return `${days}d ${hours % 24}h remaining`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m remaining`;
+  return `${minutes}m remaining`;
+}
+
+function parseDatetimeLocalAsCT(datetimeString) {
+  if (!datetimeString) return null;
+  // datetime-local gives "YYYY-MM-DDTHH:MM" with no timezone
+  // We need to interpret it as Central Time (America/Chicago)
+  // Try CST (-06:00) first, then CDT (-05:00), pick whichever matches the input hour
+  const inputHour = parseInt(datetimeString.split('T')[1].split(':')[0]);
+
+  const cstAttempt = new Date(datetimeString + '-06:00');
+  const cstHour = parseInt(cstAttempt.toLocaleString('en-US', {
+    timeZone: 'America/Chicago', hour: 'numeric', hour12: false
+  }));
+  if (cstHour === inputHour) return cstAttempt.getTime();
+
+  const cdtAttempt = new Date(datetimeString + '-05:00');
+  return cdtAttempt.getTime();
+}
+
+function timestampToDatetimeLocalCT(timestamp) {
+  if (!timestamp) return '';
+  // Format timestamp as YYYY-MM-DDTHH:MM in America/Chicago timezone
+  // sv-SE locale gives ISO-like format: "2025-03-15 14:30:00"
+  const str = new Date(timestamp).toLocaleString('sv-SE', { timeZone: 'America/Chicago' });
+  return str.replace(' ', 'T').substring(0, 16);
 }
 
 function formatRelativeTime(timestamp) {
