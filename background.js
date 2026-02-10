@@ -562,6 +562,10 @@ async function checkForChanges(monitorId) {
     const changed = currentContent !== monitor.lastContent;
 
     const updates = { lastChecked: Date.now() };
+    // Backfill page title if missing
+    if (!monitor.pageTitle && result.pageTitle) {
+      updates.pageTitle = result.pageTitle;
+    }
     if (changed) {
       const newPreview = currentContent.substring(0, 100) +
         (currentContent.length > 100 ? '...' : '');
@@ -721,7 +725,8 @@ function extractElementContent(selector, selectorPath) {
 
   return {
     found: true,
-    content: element.textContent.trim()
+    content: element.textContent.trim(),
+    pageTitle: document.title
   };
 }
 
