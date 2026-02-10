@@ -471,12 +471,18 @@
       display: block;
     }
 
+    .active-search,
+    .archived-search {
+      padding: 12px 0;
+    }
+
     .archived-search {
       padding: 12px 16px;
       background: #fff;
       border-bottom: 1px solid #e0e0e0;
     }
 
+    .active-search input,
     .archived-search input {
       width: 100%;
       padding: 10px 12px;
@@ -486,6 +492,7 @@
       box-sizing: border-box;
     }
 
+    .active-search input:focus,
     .archived-search input:focus {
       outline: none;
       border-color: #4285f4;

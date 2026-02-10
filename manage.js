@@ -2,6 +2,7 @@ let monitors = [];
 let timestampInterval = null;
 let isCheckingAll = false;
 let currentFilter = 'all';
+let activeSearchQuery = '';
 let archivedSearchQuery = '';
 let archivedSectionExpanded = false;
 
@@ -276,6 +277,17 @@ function renderMonitors(monitors) {
   const archivedMonitors = monitors.filter(m => m.isArchived);
   archivedMonitors.sort((a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0));
 
+  // Filter active monitors by search query
+  const filteredActiveMonitors = activeMonitors.filter(m => {
+    if (!activeSearchQuery) return true;
+    const query = activeSearchQuery.toLowerCase();
+    return m.url.toLowerCase().includes(query) ||
+           (m.pageTitle && m.pageTitle.toLowerCase().includes(query)) ||
+           m.selector.toLowerCase().includes(query) ||
+           (m.elementPreview && m.elementPreview.toLowerCase().includes(query)) ||
+           (m.notes && m.notes.toLowerCase().includes(query));
+  });
+
   // Filter archived monitors by search query
   const filteredArchivedMonitors = archivedMonitors.filter(m => {
     if (!archivedSearchQuery) return true;
@@ -283,7 +295,8 @@ function renderMonitors(monitors) {
     return m.url.toLowerCase().includes(query) ||
            (m.pageTitle && m.pageTitle.toLowerCase().includes(query)) ||
            m.selector.toLowerCase().includes(query) ||
-           (m.elementPreview && m.elementPreview.toLowerCase().includes(query));
+           (m.elementPreview && m.elementPreview.toLowerCase().includes(query)) ||
+           (m.notes && m.notes.toLowerCase().includes(query));
   });
 
   if (monitors.length === 0) {
@@ -308,7 +321,15 @@ function renderMonitors(monitors) {
   if (activeMonitors.length > 0) {
     html += `
       <div class="monitor-list">
-        ${activeMonitors.map(monitor => renderMonitorCard(monitor, false)).join('')}
+        ${activeMonitors.length > 3 ? `
+          <div class="active-search">
+            <input type="text" id="activeSearchInput" placeholder="Search active monitors..." value="${escapeHtml(activeSearchQuery)}">
+          </div>
+        ` : ''}
+        ${filteredActiveMonitors.length > 0 ?
+          filteredActiveMonitors.map(monitor => renderMonitorCard(monitor, false)).join('') :
+          '<div class="no-results">No active monitors match your search.</div>'
+        }
       </div>
     `;
   } else if (archivedMonitors.length > 0) {
@@ -348,7 +369,7 @@ function renderMonitors(monitors) {
   updateFilterCounts();
 
   // Add event listeners for active monitors
-  activeMonitors.forEach(monitor => {
+  filteredActiveMonitors.forEach(monitor => {
     setupMonitorCardListeners(monitor, false);
   });
 
@@ -363,6 +384,21 @@ function renderMonitors(monitors) {
     archivedHeader.addEventListener('click', () => {
       archivedSectionExpanded = !archivedSectionExpanded;
       renderMonitors(monitors);
+    });
+  }
+
+  // Active search input
+  const activeSearchInput = document.getElementById('activeSearchInput');
+  if (activeSearchInput) {
+    activeSearchInput.addEventListener('input', (e) => {
+      const cursorPos = e.target.selectionStart;
+      activeSearchQuery = e.target.value;
+      renderMonitors(monitors);
+      const newInput = document.getElementById('activeSearchInput');
+      if (newInput) {
+        newInput.focus();
+        newInput.setSelectionRange(cursorPos, cursorPos);
+      }
     });
   }
 
