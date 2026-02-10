@@ -117,17 +117,55 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 12px;
+      gap: 12px;
+    }
+
+    .monitor-header-left {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .monitor-title-row {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin-bottom: 4px;
+    }
+
+    .monitor-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #202124;
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .monitor-title:hover {
+      color: #4285f4;
+    }
+
+    .monitor-title.no-title {
+      font-weight: 500;
+      color: #4285f4;
+      font-size: 14px;
+    }
+
+    .monitor-url-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
     }
 
     .monitor-url {
-      font-size: 14px;
-      color: #4285f4;
-      text-decoration: none;
-      word-break: break-all;
-    }
-
-    .monitor-url:hover {
-      text-decoration: underline;
+      font-size: 12px;
+      color: #5f6368;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 400px;
     }
 
     .monitor-actions {
@@ -308,8 +346,9 @@
       border-left-color: #9aa0a6;
     }
 
-    .monitor-card.archived .monitor-url {
+    .monitor-card.archived .monitor-title {
       color: #5f6368;
+      font-weight: 500;
     }
 
     /* Archive button */

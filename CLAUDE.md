@@ -92,6 +92,7 @@ The check flow is:
   monitors: [{
     id: string,
     url: string,
+    pageTitle: string,                 // page title at time of monitor creation
     selector: string,
     selectorPath: number[],
     elementPreview: string,

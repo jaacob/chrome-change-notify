@@ -330,6 +330,7 @@ async function addMonitor(data) {
   const monitor = {
     id: Date.now().toString(),
     url: data.url,
+    pageTitle: data.pageTitle || '',
     selector: data.selector,
     selectorPath: data.selectorPath,
     elementPreview: data.elementPreview,

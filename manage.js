@@ -281,6 +281,7 @@ function renderMonitors(monitors) {
     if (!archivedSearchQuery) return true;
     const query = archivedSearchQuery.toLowerCase();
     return m.url.toLowerCase().includes(query) ||
+           (m.pageTitle && m.pageTitle.toLowerCase().includes(query)) ||
            m.selector.toLowerCase().includes(query) ||
            (m.elementPreview && m.elementPreview.toLowerCase().includes(query));
   });
@@ -716,17 +717,25 @@ function renderMonitorCard(monitor, isArchived) {
   `;
 
   const archiveButtonText = isArchived ? 'Unarchive' : 'Archive';
+  const displayTitle = monitor.pageTitle || '';
+  const urlPath = hostname + (url.pathname !== '/' ? url.pathname : '');
 
   return `
     <div class="monitor-card${hasChange && !isArchived ? ' changed' : ''}${isArchived ? ' archived' : ''}" id="monitor-${monitor.id}">
       <div class="monitor-header">
-        <div>
-          ${starButton}
-          <a href="${monitor.url}" target="_blank" class="monitor-url" title="${monitor.url}">
-            ${hostname}${url.pathname !== '/' ? url.pathname : ''}
-          </a>
-          ${changeBadge}
-          ${expirationBadge}
+        <div class="monitor-header-left">
+          <div class="monitor-title-row">
+            ${starButton}
+            ${displayTitle
+              ? `<a href="${monitor.url}" target="_blank" class="monitor-title" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</a>`
+              : `<a href="${monitor.url}" target="_blank" class="monitor-title no-title">${urlPath}</a>`
+            }
+          </div>
+          <div class="monitor-url-row">
+            ${displayTitle ? `<span class="monitor-url">${urlPath}</span>` : ''}
+            ${changeBadge}
+            ${expirationBadge}
+          </div>
         </div>
         <div class="monitor-actions">
           ${!isArchived && !expired ? '<button class="btn btn-check">Check Now</button>' : ''}

@@ -147,6 +147,7 @@ function handleClick(e) {
     action: 'addMonitor',
     data: {
       url: window.location.href,
+      pageTitle: document.title,
       selector: selector,
       selectorPath: path,
       elementPreview: preview,
