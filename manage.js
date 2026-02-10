@@ -456,6 +456,26 @@ function setupMonitorCardListeners(monitor, isArchived) {
     });
   }
 
+  // Notes textarea - auto-save on blur, auto-resize
+  const notesInput = card.querySelector('.notes-input');
+  if (notesInput) {
+    // Auto-resize to content
+    const autoResize = () => {
+      notesInput.style.height = 'auto';
+      notesInput.style.height = notesInput.scrollHeight + 'px';
+    };
+    notesInput.addEventListener('input', autoResize);
+    // Resize on initial render if there's content
+    if (notesInput.value) autoResize();
+
+    notesInput.addEventListener('blur', () => {
+      const newNotes = notesInput.value.trim();
+      if (newNotes !== (monitor.notes || '')) {
+        setNotes(monitor.id, newNotes);
+      }
+    });
+  }
+
   // History toggle
   const historyToggle = card.querySelector('.history-toggle');
   if (historyToggle) {
@@ -748,6 +768,10 @@ function renderMonitorCard(monitor, isArchived) {
         ${escapeHtml(monitor.selector)}
       </div>
 
+      <div class="monitor-notes">
+        <textarea class="notes-input" placeholder="Add a note..." rows="1">${escapeHtml(monitor.notes || '')}</textarea>
+      </div>
+
       ${monitor.previousContent && monitor.lastContent && monitor.lastChangeDetected && !isArchived ? `
         <div class="diff-container">
           ${renderInlineDiff(monitor.previousContent, monitor.lastContent)}
@@ -926,6 +950,14 @@ function setExpiration(id, expiresAt) {
     } else {
       showToast('Failed to set expiration', 'error');
     }
+  });
+}
+
+function setNotes(id, notes) {
+  chrome.runtime.sendMessage({
+    action: 'setNotes',
+    id,
+    notes
   });
 }
 

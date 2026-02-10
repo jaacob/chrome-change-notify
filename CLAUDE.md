@@ -107,6 +107,7 @@ The check flow is:
     isArchived: boolean,               // true = monitor is archived (no checking, data preserved)
     isStarred: boolean,                // true = monitor is starred (sorts to top of list)
     expiresAt: number | null,          // timestamp (ms) when monitor expires and auto-archives, null = no expiration
+    notes: string,                     // user notes about this monitor
     lastChangeDetected: number | null, // timestamp when change was detected, null after acknowledged
     changeHistory: [{                  // full history of all changes
       timestamp: number,

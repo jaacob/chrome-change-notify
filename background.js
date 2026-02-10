@@ -102,7 +102,10 @@ async function updateBadgeForUrl(url) {
 // ============================================================================
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name.startsWith('monitor_')) {
+  if (alarm.name.startsWith('expwarn_')) {
+    const monitorId = alarm.name.replace('expwarn_', '');
+    sendExpirationWarning(monitorId);
+  } else if (alarm.name.startsWith('monitor_')) {
     const monitorId = alarm.name.replace('monitor_', '');
     queueCheck(monitorId);
   }
@@ -148,6 +151,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'setExpiration':
       setExpiration(message.id, message.expiresAt).then(sendResponse);
       return true;
+    case 'setNotes':
+      updateMonitorInStorage(message.id, { notes: message.notes }).then(() => {
+        sendResponse({ success: true });
+      });
+      return true;
   }
 });
 
@@ -163,8 +171,9 @@ async function archiveMonitor(monitorId) {
     isArchived: true,
     lastChangeDetected: null // Clear change indicator when archiving
   });
-  // Remove the alarm so it stops checking
+  // Remove alarms
   await chrome.alarms.clear(`monitor_${monitorId}`);
+  await chrome.alarms.clear(`expwarn_${monitorId}`);
   return { success: true };
 }
 
@@ -197,6 +206,9 @@ async function toggleStar(monitorId) {
 async function setExpiration(monitorId, expiresAt) {
   await updateMonitorInStorage(monitorId, { expiresAt: expiresAt || null });
 
+  // Schedule or clear the 30-min warning notification
+  scheduleExpirationWarning(monitorId, expiresAt || null);
+
   if (expiresAt && Date.now() >= expiresAt + EXPIRATION_ARCHIVE_DELAY) {
     // Expired 24+ hours ago - auto-archive
     await archiveMonitor(monitorId);
@@ -214,6 +226,40 @@ async function setExpiration(monitorId, expiresAt) {
   }
 
   return { success: true };
+}
+
+const EXPIRATION_WARNING_MINUTES = 30;
+
+// Schedule a one-time alarm to fire 30 min before expiration
+function scheduleExpirationWarning(monitorId, expiresAt) {
+  // Clear any existing warning alarm for this monitor
+  chrome.alarms.clear(`expwarn_${monitorId}`);
+
+  if (!expiresAt) return;
+
+  const warningTime = expiresAt - (EXPIRATION_WARNING_MINUTES * 60 * 1000);
+  const delayMs = warningTime - Date.now();
+
+  // Only schedule if the warning time is in the future
+  if (delayMs > 0) {
+    chrome.alarms.create(`expwarn_${monitorId}`, {
+      when: warningTime
+    });
+  }
+}
+
+async function sendExpirationWarning(monitorId) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+  if (!monitor || monitor.isArchived) return;
+
+  const url = new URL(monitor.url);
+  const displayName = monitor.pageTitle || url.hostname + (url.pathname !== '/' ? url.pathname : '');
+  await showNotification(
+    monitor,
+    `Expiring in ${EXPIRATION_WARNING_MINUTES} min`,
+    displayName
+  );
 }
 
 // Check all monitors sequentially with progress reporting
@@ -344,6 +390,7 @@ async function addMonitor(data) {
     isArchived: false,
     isStarred: false,
     expiresAt: null,
+    notes: '',
     // Initialize change history with the initial content
     changeHistory: [{
       timestamp: Date.now(),
@@ -366,6 +413,7 @@ async function deleteMonitor(id) {
   const filtered = monitors.filter(m => m.id !== id);
   await chrome.storage.local.set({ monitors: filtered });
   await chrome.alarms.clear(`monitor_${id}`);
+  await chrome.alarms.clear(`expwarn_${id}`);
 
   if (monitor) {
     await updateBadgeForUrl(monitor.url);
@@ -439,6 +487,14 @@ async function scheduleAllMonitors() {
   for (let i = 0; i < activeMonitors.length; i++) {
     scheduleMonitor(activeMonitors[i], i * staggerMinutes);
   }
+
+  // Schedule expiration warning alarms for all monitors with expirations
+  const allMonitors = await getMonitors();
+  allMonitors.forEach(m => {
+    if (m.expiresAt && !m.isArchived) {
+      scheduleExpirationWarning(m.id, m.expiresAt);
+    }
+  });
 }
 
 // ============================================================================
