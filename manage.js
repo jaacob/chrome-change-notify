@@ -524,6 +524,31 @@ function setupMonitorCardListeners(monitor, isArchived) {
       }
     });
   }
+
+  // Auction controls
+  const setAuctionBtn = card.querySelector('.btn-set-auction, .btn-replace-auction');
+  if (setAuctionBtn) {
+    setAuctionBtn.addEventListener('click', () => {
+      pickAuctionEndElement(monitor.id);
+    });
+  }
+
+  const clearAuctionBtn = card.querySelector('.btn-clear-auction');
+  if (clearAuctionBtn) {
+    clearAuctionBtn.addEventListener('click', () => {
+      clearAuctionEndElement(monitor.id);
+    });
+  }
+
+  const extensionInput = card.querySelector('.extension-minutes-input');
+  if (extensionInput) {
+    extensionInput.addEventListener('change', (e) => {
+      const minutes = parseInt(e.target.value);
+      if (Number.isFinite(minutes) && minutes >= 1 && minutes <= 60) {
+        updateExtensionMinutes(monitor.id, minutes);
+      }
+    });
+  }
 }
 
 function renderChangeHistory(changeHistory) {
@@ -742,6 +767,8 @@ function renderMonitorCard(monitor, isArchived) {
   const hasChange = !!monitor.lastChangeDetected;
   const expired = isMonitorExpired(monitor);
   const historyCount = monitor.changeHistory ? monitor.changeHistory.length : 0;
+  const rampInterval = computeEffectiveIntervalForUI(monitor);
+  const rampActive = !isArchived && !expired && rampInterval !== null && rampInterval < monitor.intervalMinutes;
 
   const intervalOptions = INTERVAL_OPTIONS.map(opt =>
     `<option value="${opt.value}" ${opt.value === monitor.intervalMinutes ? 'selected' : ''}>${opt.label}</option>`
@@ -839,6 +866,7 @@ function renderMonitorCard(monitor, isArchived) {
             <select class="interval-select">
               ${intervalOptions}
             </select>
+            ${rampActive ? `<span class="ramp-hint">⚡ ramped to ${rampInterval} min</span>` : ''}
           </div>
         ` : ''}
 
@@ -848,6 +876,25 @@ function renderMonitorCard(monitor, isArchived) {
             <span>Expires:</span>
             <input type="datetime-local" class="expiration-input" value="${timestampToDatetimeLocalCT(monitor.expiresAt)}">
             ${monitor.expiresAt ? '<button class="btn-clear-expiration" title="Clear expiration">✕</button>' : ''}
+          </div>
+        ` : ''}
+
+        ${!isArchived && monitor.expiresAt ? `
+          <div class="auction-controls">
+            <div class="auction-controls-group">
+              <span class="auction-label">🔨 Auction end-time:</span>
+              ${monitor.auctionEndSelector
+                ? '<span class="auction-status">✓ tracking</span><button class="btn-auction btn-replace-auction">Replace</button><button class="btn-auction btn-auction-clear btn-clear-auction">Clear</button>'
+                : '<span class="auction-status unset">not set</span><button class="btn-auction btn-set-auction">Set element</button>'
+              }
+            </div>
+            ${monitor.auctionEndSelector ? `
+              <div class="auction-controls-group">
+                <span>Extend by</span>
+                <input type="number" class="extension-minutes-input" min="1" max="60" value="${monitor.extensionMinutes || 2}">
+                <span>min on text change</span>
+              </div>
+            ` : ''}
           </div>
         ` : ''}
 
@@ -995,6 +1042,48 @@ function setNotes(id, notes) {
     id,
     notes
   });
+}
+
+function pickAuctionEndElement(monitorId) {
+  showToast('Opening page to pick element…', '');
+  chrome.runtime.sendMessage({ action: 'pickAuctionEndElement', monitorId }, (response) => {
+    if (!response || !response.success) {
+      showToast(response?.error || 'Failed to open picker', 'error');
+    }
+  });
+}
+
+function clearAuctionEndElement(monitorId) {
+  chrome.runtime.sendMessage({ action: 'clearAuctionEndElement', monitorId }, (response) => {
+    if (response && response.success) {
+      showToast('Auction tracking cleared', 'success');
+      loadMonitors();
+    } else {
+      showToast('Failed to clear auction tracking', 'error');
+    }
+  });
+}
+
+function updateExtensionMinutes(monitorId, minutes) {
+  chrome.runtime.sendMessage({ action: 'updateExtensionMinutes', monitorId, minutes }, (response) => {
+    if (response && response.success) {
+      showToast('Extension minutes updated', 'success');
+    } else {
+      showToast('Failed to update extension', 'error');
+    }
+  });
+}
+
+// Mirrors background.js computeEffectiveInterval. Used for the "ramp active"
+// hint shown next to the interval dropdown.
+function computeEffectiveIntervalForUI(monitor) {
+  const userInterval = monitor.intervalMinutes;
+  if (!monitor.expiresAt) return null;
+  const minutesToExpiry = (monitor.expiresAt - Date.now()) / 60000;
+  if (minutesToExpiry <= 0) return userInterval;
+  if (minutesToExpiry > 60) return userInterval;
+  if (minutesToExpiry > 15) return Math.min(5, userInterval);
+  return Math.min(1, userInterval);
 }
 
 function isMonitorExpired(monitor) {

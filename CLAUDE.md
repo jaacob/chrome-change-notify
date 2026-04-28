@@ -109,6 +109,10 @@ The check flow is:
     expiresAt: number | null,          // timestamp (ms) when monitor expires and auto-archives, null = no expiration
     notes: string,                     // user notes about this monitor
     lastChangeDetected: number | null, // timestamp when change was detected, null after acknowledged
+    auctionEndSelector: string | null, // optional secondary element selector for auction end-time
+    auctionEndSelectorPath: number[] | null,  // fallback DOM path for the secondary element
+    auctionEndContent: string | null,  // last-seen text of the auction end-time element
+    extensionMinutes: number,          // anti-snipe: minutes to bump expiresAt on auction-end text change (default 2)
     changeHistory: [{                  // full history of all changes
       timestamp: number,
       content: string,

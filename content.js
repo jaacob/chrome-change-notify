@@ -4,7 +4,14 @@ let selectionMode = false;
 let highlightedElement = null;
 let overlay = null;
 let tooltip = null;
+let banner = null;
 let monitorHighlights = []; // Track highlight overlays
+
+// Picker state — drives whether the next click registers as primary,
+// secondary (after primary on create), or auctionEnd (edit-flow remote pick).
+let pickerStage = 'primary'; // 'primary' | 'awaitingSecondary' | 'auctionEnd'
+let pickerMonitorId = null;
+let primaryPickData = null;
 
 // Color palette for highlighting multiple monitors
 const HIGHLIGHT_COLORS = [
@@ -21,6 +28,9 @@ const HIGHLIGHT_COLORS = [
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'startSelection') {
+    pickerStage = message.mode === 'auctionEnd' ? 'auctionEnd' : 'primary';
+    pickerMonitorId = message.monitorId || null;
+    primaryPickData = null;
     startSelectionMode();
     sendResponse({ success: true });
   } else if (message.action === 'cancelSelection') {
@@ -67,6 +77,10 @@ function cancelSelectionMode() {
     tooltip.remove();
     tooltip = null;
   }
+  if (banner) {
+    banner.remove();
+    banner = null;
+  }
 
   // Remove highlight
   if (highlightedElement) {
@@ -77,6 +91,11 @@ function cancelSelectionMode() {
   document.removeEventListener('mousemove', handleMouseMove, true);
   document.removeEventListener('click', handleClick, true);
   document.removeEventListener('keydown', handleKeyDown, true);
+
+  // Reset picker state
+  pickerStage = 'primary';
+  pickerMonitorId = null;
+  primaryPickData = null;
 }
 
 function createOverlay() {
@@ -92,14 +111,22 @@ function createTooltip() {
   document.body.appendChild(tooltip);
 }
 
+function isPickerOwnElement(target) {
+  return (
+    target.id === 'dom-monitor-overlay' ||
+    target.id === 'dom-monitor-tooltip' ||
+    target.id === 'dom-monitor-banner' ||
+    target.closest('#dom-monitor-overlay') ||
+    target.closest('#dom-monitor-tooltip') ||
+    target.closest('#dom-monitor-banner')
+  );
+}
+
 function handleMouseMove(e) {
   if (!selectionMode) return;
 
   // Ignore our own elements
-  if (e.target.id === 'dom-monitor-overlay' ||
-      e.target.id === 'dom-monitor-tooltip' ||
-      e.target.closest('#dom-monitor-overlay') ||
-      e.target.closest('#dom-monitor-tooltip')) {
+  if (isPickerOwnElement(e.target)) {
     return;
   }
 
@@ -123,11 +150,8 @@ function handleMouseMove(e) {
 function handleClick(e) {
   if (!selectionMode) return;
 
-  // Ignore our own elements
-  if (e.target.id === 'dom-monitor-overlay' ||
-      e.target.id === 'dom-monitor-tooltip' ||
-      e.target.closest('#dom-monitor-overlay') ||
-      e.target.closest('#dom-monitor-tooltip')) {
+  // Clicks on our own UI (overlay/tooltip/banner) bypass the picker
+  if (isPickerOwnElement(e.target)) {
     return;
   }
 
@@ -135,31 +159,114 @@ function handleClick(e) {
   e.stopPropagation();
 
   const element = highlightedElement || e.target;
-
-  // Generate selector and path
   const selector = generateSelector(element);
   const path = generatePath(element);
   const content = element.textContent.trim();
   const preview = content.substring(0, 100) + (content.length > 100 ? '...' : '');
 
-  // Send to background
-  chrome.runtime.sendMessage({
-    action: 'addMonitor',
-    data: {
+  if (pickerStage === 'auctionEnd') {
+    const monitorId = pickerMonitorId;
+    chrome.runtime.sendMessage({
+      action: 'setAuctionEndElement',
+      monitorId,
+      data: { selector, selectorPath: path, text: content }
+    }, (response) => {
+      if (response && response.success) {
+        const msg = response.parsedExpiresAt
+          ? 'Auction tracking saved · expires ' + new Date(response.parsedExpiresAt).toLocaleString()
+          : 'Auction tracking saved';
+        showSuccessMessage(msg);
+        // Tab was opened only for the picker; close it once we're done
+        setTimeout(() => window.close(), 1500);
+      }
+    });
+    cancelSelectionMode();
+    return;
+  }
+
+  if (pickerStage === 'primary') {
+    primaryPickData = {
       url: window.location.href,
       pageTitle: document.title,
-      selector: selector,
+      selector,
       selectorPath: path,
       elementPreview: preview,
       currentContent: content
-    }
+    };
+    pickerStage = 'awaitingSecondary';
+    showSecondaryPickerBanner();
+    return;
+  }
+
+  if (pickerStage === 'awaitingSecondary') {
+    chrome.runtime.sendMessage({
+      action: 'addMonitor',
+      data: {
+        ...primaryPickData,
+        auctionEndSelector: selector,
+        auctionEndSelectorPath: path,
+        auctionEndText: content
+      }
+    }, (response) => {
+      if (response && response.success) {
+        const monitor = response.monitor || {};
+        const msg = monitor.expiresAt
+          ? 'Monitor added · expires ' + new Date(monitor.expiresAt).toLocaleString()
+          : 'Monitor added · couldn’t auto-detect expiration, set manually';
+        showSuccessMessage(msg);
+      }
+    });
+    cancelSelectionMode();
+  }
+}
+
+function saveWithoutAuctionTracking() {
+  if (!primaryPickData) {
+    cancelSelectionMode();
+    return;
+  }
+  chrome.runtime.sendMessage({
+    action: 'addMonitor',
+    data: primaryPickData
   }, (response) => {
     if (response && response.success) {
       showSuccessMessage();
     }
   });
-
   cancelSelectionMode();
+}
+
+function showSecondaryPickerBanner() {
+  if (banner) banner.remove();
+  banner = document.createElement('div');
+  banner.id = 'dom-monitor-banner';
+
+  const text = document.createElement('div');
+  text.className = 'dom-monitor-banner-text';
+  const strong = document.createElement('strong');
+  strong.textContent = 'Optional: ';
+  text.appendChild(strong);
+  text.appendChild(document.createTextNode(
+    'click the auction end-time element to enable anti-snipe extension, or skip.'
+  ));
+  banner.appendChild(text);
+
+  const skipBtn = document.createElement('button');
+  skipBtn.id = 'dom-monitor-skip-btn';
+  skipBtn.type = 'button';
+  skipBtn.textContent = 'Save without auction tracking';
+  skipBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    saveWithoutAuctionTracking();
+  });
+  banner.appendChild(skipBtn);
+
+  document.body.appendChild(banner);
+
+  if (tooltip) {
+    tooltip.textContent = 'Click the auction end-time element, or use the Skip button (ESC to cancel)';
+  }
 }
 
 function handleKeyDown(e) {
@@ -233,10 +340,10 @@ function generatePath(element) {
   return path;
 }
 
-function showSuccessMessage() {
+function showSuccessMessage(text) {
   const msg = document.createElement('div');
   msg.id = 'dom-monitor-success';
-  msg.innerHTML = '✓ Element added to monitor list';
+  msg.textContent = '✓ ' + (text || 'Element added to monitor list');
   document.body.appendChild(msg);
 
   setTimeout(() => {

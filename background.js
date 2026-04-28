@@ -6,6 +6,117 @@ const CHECK_TIMEOUT = 30000; // 30 second timeout for page load
 const JS_RENDER_DELAY = 2000; // Wait for JS to render after page load
 const EXPIRATION_CHECK_GRACE = 60 * 60 * 1000; // Keep checking for 1 hour after expiration
 const EXPIRATION_ARCHIVE_DELAY = 24 * 60 * 60 * 1000; // Auto-archive 24 hours after expiration
+const DEFAULT_EXTENSION_MINUTES = 2; // Default anti-snipe extension when auction-end text changes
+
+// Best-effort parse of an auction-end-time element's text into a future
+// timestamp. Real-world auction labels look like:
+//   "Bidding Ends:\nTue, Apr 28, 2026 at 01:07:30 pm CT"
+//   "Closes May 30, 2026 3:00 PM PST"
+//   "Ends in 2 hours"
+// Date.parse trips on "at", on ambiguous tz abbreviations (CT/ET/PT/MT),
+// on leading-zero hours combined with day-of-week, and on label prefixes —
+// so we normalize aggressively, build several candidate strings, and try
+// each. Falls back to time-only and relative-duration matchers.
+function parseAuctionEndTime(text) {
+  if (!text) return null;
+  const raw = String(text).trim();
+  if (!raw) return null;
+
+  // Normalize a candidate so Date.parse will accept it. Drops leading
+  // day-of-week names, the word "at" between date and time, ambiguous
+  // tz abbreviations, and trailing "left"/"remaining" suffixes.
+  function normalize(s) {
+    return s
+      .replace(/\s+/g, ' ')
+      .replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day|s\.?|\.|,)?[\s,]+/i, '')
+      .replace(/\s+at\s+(?=\d)/gi, ' ')
+      .replace(/\s+(?:CT|ET|PT|MT)\b\s*$/i, '')
+      .replace(/\s+(?:left|remaining|to\s+go)\s*$/i, '')
+      .trim();
+  }
+
+  function stripLabel(s) {
+    return s
+      .replace(/^(?:auction\s+|lot\s+|bidding\s+)?(?:ends?|closes?|closing|ending|expires?|finishes?)\s*[:\-–—]?\s*/i, '')
+      .replace(/^\s*(?:on|at|in)\s+/i, '')
+      .replace(/^\s*[:\-–—]\s*/, '')
+      .trim();
+  }
+
+  // Build candidate strings — different ways to extract a date phrase
+  const candidates = new Set();
+  candidates.add(normalize(stripLabel(raw)));
+  candidates.add(normalize(raw));
+
+  for (const line of raw.split(/\n/)) {
+    const t = line.trim();
+    if (t) {
+      candidates.add(normalize(stripLabel(t)));
+      candidates.add(normalize(t));
+    }
+  }
+  const colonMatch = raw.match(/:\s*([\s\S]+)$/);
+  if (colonMatch) {
+    candidates.add(normalize(colonMatch[1]));
+  }
+
+  const oneYear = 365 * 24 * 60 * 60 * 1000;
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const ts = Date.parse(candidate);
+    if (Number.isFinite(ts) && ts > Date.now() && ts < Date.now() + oneYear) {
+      return ts;
+    }
+  }
+
+  const labelStripped = normalize(stripLabel(raw));
+
+  const timeMatch = labelStripped.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?\s*([a-z]{2,4})?$/i);
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1], 10);
+    const min = parseInt(timeMatch[2], 10);
+    const sec = parseInt(timeMatch[3] || '0', 10);
+    const ampm = (timeMatch[4] || '').toLowerCase();
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+    const today = new Date();
+    let ts = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, min, sec).getTime();
+    if (ts <= Date.now()) ts += 86400000;
+    return ts;
+  }
+
+  const tokens = [
+    { re: /(\d+)\s*d(?:ays?)?\b/i, ms: 86400000 },
+    { re: /(\d+)\s*h(?:ours?|rs?)?\b/i, ms: 3600000 },
+    { re: /(\d+)\s*m(?:inutes?|ins?)?\b/i, ms: 60000 },
+    { re: /(\d+)\s*s(?:econds?|ecs?)?\b/i, ms: 1000 }
+  ];
+  let totalMs = 0;
+  let matched = false;
+  for (const { re, ms } of tokens) {
+    const m = labelStripped.match(re);
+    if (m) {
+      totalMs += parseInt(m[1], 10) * ms;
+      matched = true;
+    }
+  }
+  if (matched) return Date.now() + totalMs;
+
+  return null;
+}
+
+// Adaptive ramp tiers. When a monitor has expiresAt set, the effective
+// interval shortens inside the final hour. The user's intervalMinutes
+// always acts as a cap — we never check less often than they configured.
+function computeEffectiveInterval(monitor) {
+  const userInterval = monitor.intervalMinutes;
+  if (!monitor.expiresAt) return userInterval;
+  const minutesToExpiry = (monitor.expiresAt - Date.now()) / 60000;
+  if (minutesToExpiry <= 0) return userInterval; // grace window: revert to user interval
+  if (minutesToExpiry > 60) return userInterval;
+  if (minutesToExpiry > 15) return Math.min(5, userInterval);
+  return Math.min(1, userInterval);
+}
 
 // Queue for sequential processing
 let checkQueue = [];
@@ -156,6 +267,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true });
       });
       return true;
+    case 'pickAuctionEndElement':
+      pickAuctionEndElement(message.monitorId).then(sendResponse);
+      return true;
+    case 'setAuctionEndElement':
+      setAuctionEndElement(message.monitorId, message.data).then(sendResponse);
+      return true;
+    case 'clearAuctionEndElement':
+      updateMonitorInStorage(message.monitorId, {
+        auctionEndSelector: null,
+        auctionEndSelectorPath: null,
+        auctionEndContent: null
+      }).then(() => sendResponse({ success: true }));
+      return true;
+    case 'updateExtensionMinutes':
+      updateMonitorInStorage(message.monitorId, {
+        extensionMinutes: Math.max(1, Math.min(60, parseInt(message.minutes) || DEFAULT_EXTENSION_MINUTES))
+      }).then(() => sendResponse({ success: true }));
+      return true;
   }
 });
 
@@ -163,6 +292,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function acknowledgeChange(monitorId) {
   await updateMonitorInStorage(monitorId, { lastChangeDetected: null });
   return { success: true };
+}
+
+// Open the monitor's URL in a new foreground tab and start the picker in
+// auction-end mode. The user clicks the auction end-time element on the
+// page; content.js sends back setAuctionEndElement and closes the tab.
+async function pickAuctionEndElement(monitorId) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+  if (!monitor) return { success: false, error: 'Monitor not found' };
+
+  const tab = await chrome.tabs.create({ url: monitor.url, active: true });
+
+  return new Promise((resolve) => {
+    const onUpdated = async (updatedTabId, info) => {
+      if (updatedTabId !== tab.id || info.status !== 'complete') return;
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+
+      const startMessage = { action: 'startSelection', mode: 'auctionEnd', monitorId };
+      try {
+        await chrome.tabs.sendMessage(tab.id, startMessage);
+        resolve({ success: true });
+      } catch (e) {
+        // content.js may not be loaded yet (e.g., on a page that loaded
+        // before the extension was installed) — inject and retry.
+        try {
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+          await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
+          await chrome.tabs.sendMessage(tab.id, startMessage);
+          resolve({ success: true });
+        } catch (e2) {
+          resolve({ success: false, error: e2.message });
+        }
+      }
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
+}
+
+async function setAuctionEndElement(monitorId, data) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+  if (!monitor) return { success: false, error: 'Monitor not found' };
+
+  const updates = {
+    auctionEndSelector: data.selector,
+    auctionEndSelectorPath: data.selectorPath,
+    // Seed the baseline from the picked text so the first check doesn't
+    // false-trigger anti-snipe (and so we have something to compare against)
+    auctionEndContent: data.text || null
+  };
+
+  // Only auto-fill expiresAt when it isn't already set — never overwrite
+  // a value the user typed in manually.
+  let parsedExpiresAt = null;
+  if (!monitor.expiresAt && data.text) {
+    parsedExpiresAt = parseAuctionEndTime(data.text);
+    if (parsedExpiresAt) {
+      updates.expiresAt = parsedExpiresAt;
+    }
+  }
+
+  await updateMonitorInStorage(monitorId, updates);
+
+  if (parsedExpiresAt) {
+    scheduleExpirationWarning(monitorId, parsedExpiresAt);
+    // Reschedule the monitor alarm so the new expiresAt feeds the ramp
+    const refreshed = (await getMonitors()).find(m => m.id === monitorId);
+    if (refreshed) scheduleMonitor(refreshed);
+  }
+
+  return { success: true, parsedExpiresAt };
 }
 
 // Archive a monitor (stop checking but keep all data)
@@ -373,6 +573,7 @@ function sleep(ms) {
 
 async function addMonitor(data) {
   const monitors = await getMonitors();
+  const parsedExpiresAt = data.auctionEndText ? parseAuctionEndTime(data.auctionEndText) : null;
   const monitor = {
     id: Date.now().toString(),
     url: data.url,
@@ -389,8 +590,13 @@ async function addMonitor(data) {
     isDynamic: data.isDynamic !== false,
     isArchived: false,
     isStarred: false,
-    expiresAt: null,
+    expiresAt: parsedExpiresAt,
     notes: '',
+    auctionEndSelector: data.auctionEndSelector || null,
+    auctionEndSelectorPath: data.auctionEndSelectorPath || null,
+    // Seed the baseline so the first check doesn't false-trigger anti-snipe
+    auctionEndContent: data.auctionEndText || null,
+    extensionMinutes: DEFAULT_EXTENSION_MINUTES,
     // Initialize change history with the initial content
     changeHistory: [{
       timestamp: Date.now(),
@@ -402,6 +608,9 @@ async function addMonitor(data) {
   monitors.push(monitor);
   await chrome.storage.local.set({ monitors });
   scheduleMonitor(monitor);
+  if (parsedExpiresAt) {
+    scheduleExpirationWarning(monitor.id, parsedExpiresAt);
+  }
   await updateBadgeForUrl(data.url);
 
   return { success: true, monitor };
@@ -471,10 +680,29 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
   if (monitor.isArchived) return;
   if (monitor.expiresAt && Date.now() >= monitor.expiresAt + EXPIRATION_CHECK_GRACE) return;
 
+  const effectiveInterval = computeEffectiveInterval(monitor);
   chrome.alarms.create(`monitor_${monitor.id}`, {
-    delayInMinutes: delayMinutes || monitor.intervalMinutes,
-    periodInMinutes: monitor.intervalMinutes
+    delayInMinutes: delayMinutes || effectiveInterval,
+    periodInMinutes: effectiveInterval
   });
+}
+
+// Re-fetch monitor and reschedule its alarm only when the effective interval
+// has actually changed (tier transition or anti-snipe extension). The alarm
+// is already periodic at the right value within a stable tier — recreating
+// it on every check wastes work and starves popup/UI responsiveness when
+// ramped to 1-min intervals.
+async function rescheduleMonitor(monitorId) {
+  const monitors = await getMonitors();
+  const monitor = monitors.find(m => m.id === monitorId);
+  if (!monitor || monitor.isArchived) return;
+  if (monitor.expiresAt && Date.now() >= monitor.expiresAt + EXPIRATION_CHECK_GRACE) return;
+
+  const desired = computeEffectiveInterval(monitor);
+  const existing = await chrome.alarms.get(`monitor_${monitor.id}`);
+  if (existing && existing.periodInMinutes === desired) return;
+
+  scheduleMonitor(monitor);
 }
 
 async function scheduleAllMonitors() {
@@ -611,6 +839,7 @@ async function checkForChanges(monitorId) {
         'Element Not Found',
         `The monitored element on ${new URL(monitor.url).hostname} could not be found.`
       );
+      await rescheduleMonitor(monitorId);
       return { success: false, error: 'Element not found' };
     }
 
@@ -658,10 +887,30 @@ async function checkForChanges(monitorId) {
       );
     }
 
+    // Anti-snipe: when an auction-end-time element is configured and its
+    // displayed text changed, bump expiresAt by extensionMinutes (default 2).
+    // Text-change-detection beats parsing — works regardless of date format.
+    if (monitor.auctionEndSelector && result.auctionEndText && monitor.expiresAt) {
+      if (monitor.auctionEndContent && monitor.auctionEndContent !== result.auctionEndText) {
+        const ext = (monitor.extensionMinutes || DEFAULT_EXTENSION_MINUTES) * 60000;
+        const newExpiresAt = monitor.expiresAt + ext;
+        await updateMonitorInStorage(monitorId, {
+          expiresAt: newExpiresAt,
+          auctionEndContent: result.auctionEndText
+        });
+        scheduleExpirationWarning(monitorId, newExpiresAt);
+      } else if (!monitor.auctionEndContent) {
+        // First sighting — store baseline text without extending
+        await updateMonitorInStorage(monitorId, { auctionEndContent: result.auctionEndText });
+      }
+    }
+
+    await rescheduleMonitor(monitorId);
     return { success: true, changed };
   } catch (error) {
     console.error('Error checking monitor:', error);
     await updateMonitorInStorage(monitorId, { lastChecked: Date.now() });
+    await rescheduleMonitor(monitorId);
     return { success: false, error: error.message };
   }
 }
@@ -712,11 +961,16 @@ async function checkDynamicPage(monitor) {
   // Wait for JS to render
   await sleep(JS_RENDER_DELAY);
 
-  // Extract element content
+  // Extract element content (and auction-end text if configured)
   const results = await chrome.scripting.executeScript({
     target: { tabId },
     func: extractElementContent,
-    args: [monitor.selector, monitor.selectorPath]
+    args: [
+      monitor.selector,
+      monitor.selectorPath,
+      monitor.auctionEndSelector || null,
+      monitor.auctionEndSelectorPath || null
+    ]
   });
 
   return results[0]?.result;
@@ -750,8 +1004,10 @@ function waitForPageLoad(tabId, timeout) {
   });
 }
 
-// Injected function to extract element content
-function extractElementContent(selector, selectorPath) {
+// Injected function to extract element content. When auction selectors are
+// provided, also extracts that element's text — used by the anti-snipe logic
+// to detect bid-extended close times.
+function extractElementContent(selector, selectorPath, auctionSelector, auctionPath) {
   function getElementByPath(path) {
     let current = document.body;
     if (!current) return null;
@@ -775,6 +1031,14 @@ function extractElementContent(selector, selectorPath) {
     element = getElementByPath(selectorPath);
   }
 
+  let auction = null;
+  if (auctionSelector) {
+    auction = document.querySelector(auctionSelector);
+  }
+  if (!auction && auctionPath) {
+    auction = getElementByPath(auctionPath);
+  }
+
   if (!element) {
     return { found: false };
   }
@@ -782,6 +1046,7 @@ function extractElementContent(selector, selectorPath) {
   return {
     found: true,
     content: element.textContent.trim(),
+    auctionEndText: auction ? auction.textContent.trim() : null,
     pageTitle: document.title
   };
 }

@@ -69,3 +69,44 @@ body.dom-monitor-selecting * {
     transform: translateX(0);
   }
 }
+
+#dom-monitor-banner {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fef7e0;
+  border: 2px solid #f9ab00;
+  color: #5f4500;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  z-index: 2147483647;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  pointer-events: auto;
+  max-width: 90vw;
+}
+
+#dom-monitor-banner .dom-monitor-banner-text {
+  line-height: 1.4;
+}
+
+#dom-monitor-banner #dom-monitor-skip-btn {
+  background: #f9ab00;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+#dom-monitor-banner #dom-monitor-skip-btn:hover {
+  background: #e0950a;
+}
