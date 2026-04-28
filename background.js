@@ -216,6 +216,16 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name.startsWith('expwarn_')) {
     const monitorId = alarm.name.replace('expwarn_', '');
     sendExpirationWarning(monitorId);
+  } else if (
+    alarm.name.startsWith('tier60_') ||
+    alarm.name.startsWith('tier15_') ||
+    alarm.name.startsWith('tierexp_')
+  ) {
+    // Proactive tier-transition alarm — fires at T-60m, T-15m, or T-0 so
+    // the main alarm's period gets re-evaluated immediately instead of
+    // waiting for the next regular check (which could be up to 60m away).
+    const monitorId = alarm.name.replace(/^tier(60|15|exp)_/, '');
+    rescheduleMonitor(monitorId);
   } else if (alarm.name.startsWith('monitor_')) {
     const monitorId = alarm.name.replace('monitor_', '');
     queueCheck(monitorId);
@@ -371,9 +381,7 @@ async function archiveMonitor(monitorId) {
     isArchived: true,
     lastChangeDetected: null // Clear change indicator when archiving
   });
-  // Remove alarms
-  await chrome.alarms.clear(`monitor_${monitorId}`);
-  await chrome.alarms.clear(`expwarn_${monitorId}`);
+  await clearMonitorAlarms(monitorId);
   return { success: true };
 }
 
@@ -621,8 +629,7 @@ async function deleteMonitor(id) {
   const monitor = monitors.find(m => m.id === id);
   const filtered = monitors.filter(m => m.id !== id);
   await chrome.storage.local.set({ monitors: filtered });
-  await chrome.alarms.clear(`monitor_${id}`);
-  await chrome.alarms.clear(`expwarn_${id}`);
+  await clearMonitorAlarms(id);
 
   if (monitor) {
     await updateBadgeForUrl(monitor.url);
@@ -685,6 +692,38 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
     delayInMinutes: delayMinutes || effectiveInterval,
     periodInMinutes: effectiveInterval
   });
+  scheduleTierTransitions(monitor.id, monitor.expiresAt);
+}
+
+// One-shot alarms at each tier boundary. Without these, a monitor sitting
+// in the 60-min tier when its deadline crosses T-60m wouldn't drop to the
+// 5-min tier until its main alarm next fires — up to 60 min of lag. These
+// fire rescheduleMonitor proactively at each boundary. The 1s slop ensures
+// we land just inside the new tier rather than racing the boundary.
+function scheduleTierTransitions(monitorId, expiresAt) {
+  chrome.alarms.clear(`tier60_${monitorId}`);
+  chrome.alarms.clear(`tier15_${monitorId}`);
+  chrome.alarms.clear(`tierexp_${monitorId}`);
+
+  if (!expiresAt) return;
+
+  const now = Date.now();
+  const SLOP = 1000;
+  const tier60 = expiresAt - 60 * 60 * 1000 + SLOP;
+  const tier15 = expiresAt - 15 * 60 * 1000 + SLOP;
+  const tierexp = expiresAt + SLOP;
+
+  if (tier60 > now) chrome.alarms.create(`tier60_${monitorId}`, { when: tier60 });
+  if (tier15 > now) chrome.alarms.create(`tier15_${monitorId}`, { when: tier15 });
+  if (tierexp > now) chrome.alarms.create(`tierexp_${monitorId}`, { when: tierexp });
+}
+
+async function clearMonitorAlarms(monitorId) {
+  await chrome.alarms.clear(`monitor_${monitorId}`);
+  await chrome.alarms.clear(`expwarn_${monitorId}`);
+  await chrome.alarms.clear(`tier60_${monitorId}`);
+  await chrome.alarms.clear(`tier15_${monitorId}`);
+  await chrome.alarms.clear(`tierexp_${monitorId}`);
 }
 
 // Re-fetch monitor and reschedule its alarm only when the effective interval
@@ -899,6 +938,9 @@ async function checkForChanges(monitorId) {
           auctionEndContent: result.auctionEndText
         });
         scheduleExpirationWarning(monitorId, newExpiresAt);
+        // expiresAt moved — tier alarms must shift even if the current tier
+        // didn't change (rescheduleMonitor would no-op on same period)
+        scheduleTierTransitions(monitorId, newExpiresAt);
       } else if (!monitor.auctionEndContent) {
         // First sighting — store baseline text without extending
         await updateMonitorInStorage(monitorId, { auctionEndContent: result.auctionEndText });

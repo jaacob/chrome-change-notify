@@ -2,6 +2,20 @@
 
 ## 1.12.x — Auction tracking & adaptive interval ramping
 
+### 1.12.4 — Proactive tier-transition alarms
+
+The 1.12.3 reschedule path only re-evaluated tiers when an alarm fired, so a monitor sitting in the 60-min tier wouldn't drop to the 5-min tier until its 60-min alarm fired — up to 60 minutes of lag. The UI showed "ramped" but the underlying `chrome.alarms` period stayed stale.
+
+Now `scheduleMonitor` also creates one-shot alarms at each tier boundary:
+
+- `tier60_<id>` fires at `expiresAt - 60min`
+- `tier15_<id>` fires at `expiresAt - 15min`
+- `tierexp_<id>` fires at `expiresAt`
+
+Each one calls `rescheduleMonitor` on fire, which detects the period mismatch and recreates the main alarm at the new tier's interval. A 1-second slop past each boundary ensures the alarm lands inside the new tier rather than racing it.
+
+`scheduleAllMonitors` runs on startup/install/update, so existing monitors with stale alarm periods self-heal on reload. The anti-snipe path also explicitly refreshes tier alarms when bumping `expiresAt` (since `rescheduleMonitor` would no-op when the tier doesn't change). `archiveMonitor` and `deleteMonitor` now clear all five alarm names via a `clearMonitorAlarms` helper.
+
 ### 1.12.3 — Performance: skip no-op reschedules
 
 Previously, every check called `chrome.alarms.create` to recreate the monitor's alarm. With multiple monitors in the ramp window (1-min cadence) this churned the alarm system constantly and contributed to popup latency.
