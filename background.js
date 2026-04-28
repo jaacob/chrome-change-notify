@@ -216,6 +216,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name.startsWith('expwarn_')) {
     const monitorId = alarm.name.replace('expwarn_', '');
     sendExpirationWarning(monitorId);
+  } else if (alarm.name.startsWith('tiergrace_')) {
+    // 1-hour grace ended — stop firing the main check alarm. The monitor
+    // remains visible (with "Expired" badge) until tierarchive fires at +24h.
+    const monitorId = alarm.name.replace('tiergrace_', '');
+    chrome.alarms.clear(`monitor_${monitorId}`);
+  } else if (alarm.name.startsWith('tierarchive_')) {
+    // 24h post-expiration — auto-archive the monitor.
+    const monitorId = alarm.name.replace('tierarchive_', '');
+    archiveMonitor(monitorId);
   } else if (
     alarm.name.startsWith('tier60_') ||
     alarm.name.startsWith('tier15_') ||
@@ -695,15 +704,21 @@ function scheduleMonitor(monitor, delayMinutes = 0) {
   scheduleTierTransitions(monitor.id, monitor.expiresAt);
 }
 
-// One-shot alarms at each tier boundary. Without these, a monitor sitting
-// in the 60-min tier when its deadline crosses T-60m wouldn't drop to the
-// 5-min tier until its main alarm next fires — up to 60 min of lag. These
-// fire rescheduleMonitor proactively at each boundary. The 1s slop ensures
-// we land just inside the new tier rather than racing the boundary.
+// One-shot alarms at each tier boundary. The first three (tier60/tier15/
+// tierexp) drive ramp transitions; tiergrace stops the main alarm at the
+// end of the 1-hour post-expiration grace window so we don't keep waking
+// the SW for no-op checks; tierarchive auto-archives at +24h independently
+// of whether any check happens to run. Without tiergrace, the main alarm
+// would continue firing every userInterval through the entire 1h-to-24h
+// window, with checkForChanges short-circuiting each one as wasted work.
+// 1s slop on each boundary ensures the alarm lands just inside the new
+// state rather than racing it.
 function scheduleTierTransitions(monitorId, expiresAt) {
   chrome.alarms.clear(`tier60_${monitorId}`);
   chrome.alarms.clear(`tier15_${monitorId}`);
   chrome.alarms.clear(`tierexp_${monitorId}`);
+  chrome.alarms.clear(`tiergrace_${monitorId}`);
+  chrome.alarms.clear(`tierarchive_${monitorId}`);
 
   if (!expiresAt) return;
 
@@ -712,10 +727,14 @@ function scheduleTierTransitions(monitorId, expiresAt) {
   const tier60 = expiresAt - 60 * 60 * 1000 + SLOP;
   const tier15 = expiresAt - 15 * 60 * 1000 + SLOP;
   const tierexp = expiresAt + SLOP;
+  const tiergrace = expiresAt + EXPIRATION_CHECK_GRACE + SLOP;
+  const tierarchive = expiresAt + EXPIRATION_ARCHIVE_DELAY + SLOP;
 
   if (tier60 > now) chrome.alarms.create(`tier60_${monitorId}`, { when: tier60 });
   if (tier15 > now) chrome.alarms.create(`tier15_${monitorId}`, { when: tier15 });
   if (tierexp > now) chrome.alarms.create(`tierexp_${monitorId}`, { when: tierexp });
+  if (tiergrace > now) chrome.alarms.create(`tiergrace_${monitorId}`, { when: tiergrace });
+  if (tierarchive > now) chrome.alarms.create(`tierarchive_${monitorId}`, { when: tierarchive });
 }
 
 async function clearMonitorAlarms(monitorId) {
@@ -724,6 +743,8 @@ async function clearMonitorAlarms(monitorId) {
   await chrome.alarms.clear(`tier60_${monitorId}`);
   await chrome.alarms.clear(`tier15_${monitorId}`);
   await chrome.alarms.clear(`tierexp_${monitorId}`);
+  await chrome.alarms.clear(`tiergrace_${monitorId}`);
+  await chrome.alarms.clear(`tierarchive_${monitorId}`);
 }
 
 // Re-fetch monitor and reschedule its alarm only when the effective interval
@@ -746,21 +767,34 @@ async function rescheduleMonitor(monitorId) {
 
 async function scheduleAllMonitors() {
   const monitors = await getMonitors();
-  // Filter out archived and expired monitors
-  const activeMonitors = monitors.filter(m => !m.isArchived && !(m.expiresAt && Date.now() >= m.expiresAt + EXPIRATION_CHECK_GRACE));
-  // Stagger initial checks to prevent stampede after wake/restart
-  const staggerMinutes = Math.max(0.1, Math.min(1, activeMonitors.length / 10));
+  const nonArchived = monitors.filter(m => !m.isArchived);
+  const isPastGrace = (m) => m.expiresAt && Date.now() >= m.expiresAt + EXPIRATION_CHECK_GRACE;
+  const isPastArchive = (m) => m.expiresAt && Date.now() >= m.expiresAt + EXPIRATION_ARCHIVE_DELAY;
 
-  for (let i = 0; i < activeMonitors.length; i++) {
-    scheduleMonitor(activeMonitors[i], i * staggerMinutes);
+  const active = nonArchived.filter(m => !isPastGrace(m));
+  // Stagger initial checks to prevent stampede after wake/restart
+  const staggerMinutes = Math.max(0.1, Math.min(1, active.length / 10));
+
+  for (let i = 0; i < active.length; i++) {
+    scheduleMonitor(active[i], i * staggerMinutes);
+  }
+
+  // Heal post-grace-but-not-archived monitors: clear any stale main alarm
+  // left over from an older build, then either auto-archive (past +24h) or
+  // schedule the tierarchive alarm so it cleans up at the right time.
+  for (const m of nonArchived) {
+    if (!isPastGrace(m)) continue;
+    await chrome.alarms.clear(`monitor_${m.id}`);
+    if (isPastArchive(m)) {
+      await archiveMonitor(m.id);
+    } else {
+      scheduleTierTransitions(m.id, m.expiresAt);
+    }
   }
 
   // Schedule expiration warning alarms for all monitors with expirations
-  const allMonitors = await getMonitors();
-  allMonitors.forEach(m => {
-    if (m.expiresAt && !m.isArchived) {
-      scheduleExpirationWarning(m.id, m.expiresAt);
-    }
+  nonArchived.forEach(m => {
+    if (m.expiresAt) scheduleExpirationWarning(m.id, m.expiresAt);
   });
 }
 

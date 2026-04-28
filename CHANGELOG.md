@@ -2,6 +2,17 @@
 
 ## 1.12.x — Auction tracking & adaptive interval ramping
 
+### 1.12.5 — Stop firing alarms past the expiration grace window
+
+The 1h post-expiration grace was meant to allow a few continued checks (capturing post-close state changes like an auction's final price being hidden) and then stop. The check itself was correctly short-circuited via `EXPIRATION_CHECK_GRACE` in `checkForChanges`, but the alarm itself was never cleared — it kept firing every `userInterval` for the full window between +1h and +24h, doing nothing useful and waking the SW each time.
+
+Two new tier alarms close the gap:
+
+- `tiergrace_<id>` fires at `expiresAt + 1h` and clears the main `monitor_<id>` alarm.
+- `tierarchive_<id>` fires at `expiresAt + 24h` and auto-archives the monitor (independent of any check happening).
+
+`scheduleAllMonitors` now also heals existing post-grace monitors at startup: clears stale main alarms and either auto-archives (past +24h) or schedules `tierarchive_<id>` so cleanup happens on time.
+
 ### 1.12.4 — Proactive tier-transition alarms
 
 The 1.12.3 reschedule path only re-evaluated tiers when an alarm fired, so a monitor sitting in the 60-min tier wouldn't drop to the 5-min tier until its 60-min alarm fired — up to 60 minutes of lag. The UI showed "ramped" but the underlying `chrome.alarms` period stayed stale.
