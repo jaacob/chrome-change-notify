@@ -5,6 +5,7 @@ let currentFilter = 'all';
 let activeSearchQuery = '';
 let archivedSearchQuery = '';
 let archivedSectionExpanded = false;
+let sortMode = 'default';
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
@@ -261,10 +262,61 @@ const INTERVAL_OPTIONS = [
 function loadMonitors() {
   // Read directly from storage instead of messaging service worker
   // This is more reliable, especially after Chrome restart
-  chrome.storage.local.get(['monitors'], (result) => {
+  chrome.storage.local.get(['monitors', 'sortMode'], (result) => {
     monitors = result.monitors || [];
+    sortMode = result.sortMode || 'default';
     renderMonitors(monitors);
   });
+}
+
+const SORT_OPTIONS = [
+  { value: 'default', label: 'Default (Starred first)' },
+  { value: 'expiration-asc', label: 'Expiration (Soonest first)' },
+  { value: 'expiration-desc', label: 'Expiration (Latest first)' },
+  { value: 'lastChanged-desc', label: 'Last Changed (Newest first)' },
+  { value: 'lastChanged-asc', label: 'Last Changed (Oldest first)' },
+  { value: 'createdAt-desc', label: 'Added (Newest first)' },
+  { value: 'createdAt-asc', label: 'Added (Oldest first)' },
+];
+
+function renderSortOptions(currentMode) {
+  return SORT_OPTIONS.map(opt =>
+    `<option value="${opt.value}" ${opt.value === currentMode ? 'selected' : ''}>${opt.label}</option>`
+  ).join('');
+}
+
+function sortActiveMonitors(list, mode) {
+  const starPriority = (a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0);
+
+  const nullsLast = (val, ascending) => {
+    if (val == null) return ascending ? Infinity : -Infinity;
+    return val;
+  };
+
+  const byField = (field, ascending) => (a, b) => {
+    const av = nullsLast(a[field], ascending);
+    const bv = nullsLast(b[field], ascending);
+    return ascending ? av - bv : bv - av;
+  };
+
+  const compose = (...comparators) => (a, b) => {
+    for (const cmp of comparators) {
+      const result = cmp(a, b);
+      if (result !== 0) return result;
+    }
+    return 0;
+  };
+
+  switch (mode) {
+    case 'expiration-asc':   return list.sort(compose(starPriority, byField('expiresAt', true)));
+    case 'expiration-desc':  return list.sort(compose(starPriority, byField('expiresAt', false)));
+    case 'lastChanged-desc': return list.sort(compose(starPriority, byField('lastChangeDetected', false)));
+    case 'lastChanged-asc':  return list.sort(compose(starPriority, byField('lastChangeDetected', true)));
+    case 'createdAt-desc':   return list.sort(compose(starPriority, byField('createdAt', false)));
+    case 'createdAt-asc':    return list.sort(compose(starPriority, byField('createdAt', true)));
+    case 'default':
+    default:                 return list.sort(starPriority);
+  }
 }
 
 function renderMonitors(monitors) {
@@ -273,7 +325,7 @@ function renderMonitors(monitors) {
 
   // Separate active and archived monitors, sort starred to top
   const activeMonitors = monitors.filter(m => !m.isArchived);
-  activeMonitors.sort((a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0));
+  sortActiveMonitors(activeMonitors, sortMode);
   const archivedMonitors = monitors.filter(m => m.isArchived);
   archivedMonitors.sort((a, b) => (b.isStarred ? 1 : 0) - (a.isStarred ? 1 : 0));
 
@@ -321,9 +373,14 @@ function renderMonitors(monitors) {
   if (activeMonitors.length > 0) {
     html += `
       <div class="monitor-list">
-        ${activeMonitors.length > 3 ? `
+        ${activeMonitors.length > 1 ? `
           <div class="active-search">
-            <input type="text" id="activeSearchInput" placeholder="Search active monitors..." value="${escapeHtml(activeSearchQuery)}">
+            ${activeMonitors.length > 3 ? `
+              <input type="text" id="activeSearchInput" placeholder="Search active monitors..." value="${escapeHtml(activeSearchQuery)}">
+            ` : ''}
+            <select id="sortSelect" class="sort-select">
+              ${renderSortOptions(sortMode)}
+            </select>
           </div>
         ` : ''}
         ${filteredActiveMonitors.length > 0 ?
@@ -399,6 +456,16 @@ function renderMonitors(monitors) {
         newInput.focus();
         newInput.setSelectionRange(cursorPos, cursorPos);
       }
+    });
+  }
+
+  // Sort dropdown
+  const sortSelect = document.getElementById('sortSelect');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      sortMode = e.target.value;
+      chrome.storage.local.set({ sortMode });
+      renderMonitors(monitors);
     });
   }
 
