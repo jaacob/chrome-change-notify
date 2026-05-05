@@ -6,12 +6,15 @@ let activeSearchQuery = '';
 let archivedSearchQuery = '';
 let archivedSectionExpanded = false;
 let sortMode = 'default';
+let outlineCollapsed = false;
+let scrollSpyObserver = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
   setupCheckAllButton();
   setupFilterTabs();
   setupNotificationBanner();
+  setupOutlineToggle();
   listenForProgressUpdates();
   // Update relative timestamps every minute
   timestampInterval = setInterval(updateTimestamps, 60000);
@@ -262,11 +265,127 @@ const INTERVAL_OPTIONS = [
 function loadMonitors() {
   // Read directly from storage instead of messaging service worker
   // This is more reliable, especially after Chrome restart
-  chrome.storage.local.get(['monitors', 'sortMode'], (result) => {
+  chrome.storage.local.get(['monitors', 'sortMode', 'outlineCollapsed'], (result) => {
     monitors = result.monitors || [];
     sortMode = result.sortMode || 'default';
+    outlineCollapsed = !!result.outlineCollapsed;
+    applyOutlineCollapsedState();
     renderMonitors(monitors);
   });
+}
+
+function applyOutlineCollapsedState() {
+  const panel = document.getElementById('outlinePanel');
+  if (!panel) return;
+  panel.classList.toggle('collapsed', outlineCollapsed);
+}
+
+function setupOutlineToggle() {
+  const toggle = document.getElementById('outlineToggle');
+  if (!toggle) return;
+  toggle.addEventListener('click', () => {
+    outlineCollapsed = !outlineCollapsed;
+    chrome.storage.local.set({ outlineCollapsed });
+    applyOutlineCollapsedState();
+  });
+}
+
+function getMonitorOutlineLabel(monitor) {
+  if (monitor.pageTitle && monitor.pageTitle.trim()) {
+    return monitor.pageTitle.trim();
+  }
+  try {
+    return new URL(monitor.url).hostname;
+  } catch {
+    return monitor.url;
+  }
+}
+
+function renderOutline(activeMonitorsInOrder) {
+  const panel = document.getElementById('outlinePanel');
+  const list = document.getElementById('outlineList');
+  if (!panel || !list) return;
+
+  if (activeMonitorsInOrder.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'flex';
+
+  list.replaceChildren();
+  activeMonitorsInOrder.forEach(m => {
+    const label = getMonitorOutlineLabel(m);
+    const item = document.createElement('div');
+    item.className = 'outline-item';
+    item.dataset.monitorId = m.id;
+    item.title = label;
+    if (m.isStarred) {
+      const star = document.createElement('span');
+      star.className = 'outline-star';
+      star.textContent = '★';
+      item.appendChild(star);
+    }
+    item.appendChild(document.createTextNode(label));
+    item.addEventListener('click', () => {
+      const card = document.getElementById(`monitor-${m.id}`);
+      if (!card) return;
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      card.classList.remove('outline-flash');
+      void card.offsetWidth;
+      card.classList.add('outline-flash');
+      setTimeout(() => card.classList.remove('outline-flash'), 1300);
+    });
+    list.appendChild(item);
+  });
+
+  setupScrollSpy();
+}
+
+function setupScrollSpy() {
+  if (scrollSpyObserver) {
+    scrollSpyObserver.disconnect();
+    scrollSpyObserver = null;
+  }
+
+  const monitorList = document.querySelector('.monitor-list');
+  if (!monitorList) return;
+  const cards = monitorList.querySelectorAll('.monitor-card');
+  if (cards.length === 0) return;
+
+  const visibleIds = new Set();
+
+  scrollSpyObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.id.replace('monitor-', '');
+      if (entry.isIntersecting) {
+        visibleIds.add(id);
+      } else {
+        visibleIds.delete(id);
+      }
+    });
+
+    let activeId = null;
+    let topmostTop = Infinity;
+    visibleIds.forEach(id => {
+      const card = document.getElementById(`monitor-${id}`);
+      if (!card) return;
+      const top = card.getBoundingClientRect().top;
+      if (top < topmostTop) {
+        topmostTop = top;
+        activeId = id;
+      }
+    });
+
+    document.querySelectorAll('.outline-item').forEach(item => {
+      const isActive = item.dataset.monitorId === activeId;
+      item.classList.toggle('active', isActive);
+      if (isActive) {
+        item.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  }, { rootMargin: '-15% 0px -60% 0px', threshold: 0 });
+
+  cards.forEach(card => scrollSpyObserver.observe(card));
 }
 
 const SORT_OPTIONS = [
@@ -361,6 +480,7 @@ function renderMonitors(monitors) {
         <p>Click the extension icon on any page and select an element to start monitoring.</p>
       </div>
     `;
+    renderOutline([]);
     return;
   }
 
@@ -487,6 +607,9 @@ function renderMonitors(monitors) {
 
   // Apply current filter
   applyFilter();
+
+  // Render the side outline panel using the same sorted+filtered active list
+  renderOutline(filteredActiveMonitors);
 }
 
 function setupMonitorCardListeners(monitor, isArchived) {
