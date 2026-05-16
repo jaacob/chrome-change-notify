@@ -12,6 +12,7 @@ let scrollSpyObserver = null;
 document.addEventListener('DOMContentLoaded', () => {
   loadMonitors();
   setupCheckAllButton();
+  setupBackupButtons();
   setupFilterTabs();
   setupNotificationBanner();
   setupOutlineToggle();
@@ -34,6 +35,102 @@ document.addEventListener('visibilitychange', () => {
 function setupCheckAllButton() {
   const checkAllBtn = document.getElementById('checkAllBtn');
   checkAllBtn.addEventListener('click', checkAllNow);
+}
+
+function setupBackupButtons() {
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const chooser = document.getElementById('exportChooser');
+  const fileInput = document.getElementById('importFileInput');
+
+  exportBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    chooser.hidden = !chooser.hidden;
+  });
+
+  chooser.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-scope]');
+    if (!btn) return;
+    const scope = btn.dataset.scope;
+    chooser.hidden = true;
+    if (scope === 'all' || scope === 'active') {
+      requestExport(scope);
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (chooser.hidden) return;
+    if (e.target === exportBtn || chooser.contains(e.target)) return;
+    chooser.hidden = true;
+  });
+
+  importBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) handleImportFile(file);
+  });
+}
+
+function requestExport(scope) {
+  chrome.runtime.sendMessage({ action: 'exportMonitors', scope }, (response) => {
+    if (!response || !response.success) {
+      alert('Export failed. Try again.');
+      return;
+    }
+    const { payload } = response;
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const scopeTag = payload.scope === 'active' ? 'active' : 'all';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dom-monitor-backup-${scopeTag}-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+}
+
+function handleImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let payload;
+    try {
+      payload = JSON.parse(reader.result);
+    } catch (err) {
+      alert('Could not read file: not valid JSON.');
+      return;
+    }
+    if (!payload || !Array.isArray(payload.monitors)) {
+      alert('This does not look like a DOM Monitor backup file.');
+      return;
+    }
+    const count = payload.monitors.length;
+    if (count === 0) {
+      alert('Backup file contains no monitors.');
+      return;
+    }
+    const scopeLabel = payload.scope === 'active' ? 'active' : 'all';
+    if (!confirm(`Import ${count} monitor${count === 1 ? '' : 's'} (scope: ${scopeLabel}) as new entries? Your existing monitors will not be modified.`)) {
+      return;
+    }
+    chrome.runtime.sendMessage({ action: 'importMonitors', payload }, (response) => {
+      if (!response || !response.success) {
+        alert(`Import failed: ${response && response.error ? response.error : 'unknown error'}`);
+        return;
+      }
+      alert(`Imported ${response.added} monitor${response.added === 1 ? '' : 's'}.`);
+      loadMonitors();
+    });
+  };
+  reader.onerror = () => alert('Could not read file.');
+  reader.readAsText(file);
 }
 
 function setupFilterTabs() {

@@ -731,6 +731,76 @@
       cursor: not-allowed;
     }
 
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      position: relative;
+    }
+
+    .btn-secondary {
+      padding: 10px 16px;
+      background: white;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn-secondary:hover {
+      background: #f1f3f4;
+      border-color: #c4c7c5;
+    }
+
+    .export-chooser[hidden] {
+      display: none;
+    }
+
+    .export-chooser {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 180px;
+      z-index: 100;
+    }
+
+    .export-chooser button {
+      padding: 8px 12px;
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      text-align: left;
+      font-size: 14px;
+      color: #3c4043;
+      cursor: pointer;
+    }
+
+    .export-chooser button:hover {
+      background: #f1f3f4;
+    }
+
+    .export-chooser .chooser-divider {
+      height: 1px;
+      background: #e8eaed;
+      margin: 4px 0;
+    }
+
+    .export-chooser .chooser-cancel {
+      color: #5f6368;
+      font-size: 13px;
+    }
+
     .progress-bar {
       display: none;
       margin-bottom: 24px;
@@ -1095,10 +1165,21 @@
         <h1>👁 DOM Monitor</h1>
         <p class="subtitle">Manage your monitored elements</p>
       </div>
-      <button class="btn-check-all" id="checkAllBtn" style="display: none;">
-        Check All Now
-      </button>
+      <div class="header-actions">
+        <button class="btn-secondary" id="importBtn" title="Import monitors from a backup file">Import…</button>
+        <button class="btn-secondary" id="exportBtn" title="Export monitors to a backup file">Export…</button>
+        <button class="btn-check-all" id="checkAllBtn" style="display: none;">
+          Check All Now
+        </button>
+        <div class="export-chooser" id="exportChooser" hidden>
+          <button type="button" data-scope="all">Export all monitors</button>
+          <button type="button" data-scope="active">Export active only</button>
+          <div class="chooser-divider"></div>
+          <button type="button" class="chooser-cancel" data-scope="cancel">Cancel</button>
+        </div>
+      </div>
     </div>
+    <input type="file" id="importFileInput" accept="application/json,.json" style="display: none;">
 
     <div class="notification-banner hidden" id="notificationBanner">
       <div class="notification-banner-text">

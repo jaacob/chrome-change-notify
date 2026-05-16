@@ -304,6 +304,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         extensionMinutes: Math.max(1, Math.min(60, parseInt(message.minutes) || DEFAULT_EXTENSION_MINUTES))
       }).then(() => sendResponse({ success: true }));
       return true;
+    case 'exportMonitors':
+      exportMonitors(message.scope).then(sendResponse);
+      return true;
+    case 'importMonitors':
+      importMonitors(message.payload).then(sendResponse);
+      return true;
   }
 });
 
@@ -674,6 +680,75 @@ async function updateMonitor(id, data) {
 async function getMonitors() {
   const result = await chrome.storage.local.get(['monitors']);
   return result.monitors || [];
+}
+
+const EXPORT_FORMAT_VERSION = 1;
+
+async function exportMonitors(scope) {
+  const all = await getMonitors();
+  const filtered = scope === 'active' ? all.filter(m => !m.isArchived) : all;
+  return {
+    success: true,
+    payload: {
+      version: EXPORT_FORMAT_VERSION,
+      exportedAt: Date.now(),
+      scope: scope === 'active' ? 'active' : 'all',
+      monitors: filtered
+    }
+  };
+}
+
+async function importMonitors(payload) {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.monitors)) {
+    return { success: false, error: 'Invalid backup file: missing monitors array' };
+  }
+  if (payload.version !== EXPORT_FORMAT_VERSION) {
+    return { success: false, error: `Unsupported backup version: ${payload.version}` };
+  }
+
+  const existing = await getMonitors();
+  const now = Date.now();
+  const imported = payload.monitors.map((src, i) => ({
+    id: `${now}_${i}`,
+    url: src.url || '',
+    pageTitle: src.pageTitle || '',
+    selector: src.selector || '',
+    selectorPath: src.selectorPath || [],
+    elementPreview: src.elementPreview || '',
+    previousPreview: src.previousPreview ?? null,
+    intervalMinutes: src.intervalMinutes || DEFAULT_INTERVAL,
+    lastContent: src.lastContent ?? '',
+    previousContent: src.previousContent ?? null,
+    lastChecked: src.lastChecked || now,
+    createdAt: src.createdAt || now,
+    changeCount: src.changeCount || 0,
+    isDynamic: src.isDynamic !== false,
+    isArchived: src.isArchived === true,
+    isStarred: src.isStarred === true,
+    expiresAt: src.expiresAt ?? null,
+    notes: src.notes || '',
+    auctionEndSelector: src.auctionEndSelector ?? null,
+    auctionEndSelectorPath: src.auctionEndSelectorPath ?? null,
+    auctionEndContent: src.auctionEndContent ?? null,
+    extensionMinutes: src.extensionMinutes || DEFAULT_EXTENSION_MINUTES,
+    lastChangeDetected: src.lastChangeDetected ?? null,
+    changeHistory: Array.isArray(src.changeHistory) ? src.changeHistory : []
+  }));
+
+  const merged = existing.concat(imported);
+  await chrome.storage.local.set({ monitors: merged });
+
+  const urlsTouched = new Set();
+  for (const m of imported) {
+    scheduleMonitor(m);
+    if (m.expiresAt) scheduleExpirationWarning(m.id, m.expiresAt);
+    if (m.url) urlsTouched.add(m.url);
+  }
+  for (const url of urlsTouched) {
+    await updateBadgeForUrl(url);
+  }
+
+  return { success: true, added: imported.length };
 }
 
 async function updateMonitorInStorage(monitorId, updates) {
