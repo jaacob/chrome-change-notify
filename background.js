@@ -186,7 +186,8 @@ async function updateBadge(tabId) {
     if (count > 0) {
       await chrome.action.setBadgeText({ text: count.toString(), tabId });
       await chrome.action.setBadgeBackgroundColor({ color: '#d93025', tabId });
-      await chrome.action.setBadgeTextColor({ color: '#ffffff', tabId });
+      // Not available in Safari (and some Chromium forks)
+      await chrome.action.setBadgeTextColor?.({ color: '#ffffff', tabId });
     } else {
       await chrome.action.setBadgeText({ text: '', tabId });
     }
@@ -1208,6 +1209,26 @@ function extractElementContent(selector, selectorPath, auctionSelector, auctionP
 
 async function showNotification(monitor, title, message) {
   const notificationId = `monitor_${monitor.id}_${Date.now()}`;
+
+  // Safari has no chrome.notifications; the Xcode wrapper's native handler
+  // posts the notification via UNUserNotificationCenter instead (and handles
+  // the click itself, opening monitor.url).
+  if (!chrome.notifications?.create) {
+    try {
+      await chrome.runtime.sendNativeMessage('application.id', {
+        type: 'notify',
+        id: notificationId,
+        title: title,
+        message: message,
+        url: monitor.url
+      });
+      return notificationId;
+    } catch (error) {
+      console.error('Failed to show native notification:', error);
+      return null;
+    }
+  }
+
   const iconUrl = chrome.runtime.getURL('icons/icon128.png');
 
   try {
@@ -1226,7 +1247,7 @@ async function showNotification(monitor, title, message) {
   }
 }
 
-chrome.notifications.onClicked.addListener((notificationId) => {
+chrome.notifications?.onClicked.addListener((notificationId) => {
   const parts = notificationId.split('_');
   if (parts[0] === 'monitor') {
     const monitorId = parts[1];

@@ -15,3 +15,8 @@
 
 # Claude
 .claude/
+
+# Safari wrapper (generated/synced artifacts)
+safari/build/
+safari/ExtensionResources/
+safari/**/xcuserdata/

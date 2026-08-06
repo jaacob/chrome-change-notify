@@ -1,0 +1,629 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		16F2B095302517DB00FCADCD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F2B094302517DB00FCADCD /* AppDelegate.swift */; };
+		16F2B099302517DB00FCADCD /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B097302517DB00FCADCD /* Main.html */; };
+		16F2B09B302517DB00FCADCD /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B09A302517DB00FCADCD /* Icon.png */; };
+		16F2B09D302517DB00FCADCD /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B09C302517DB00FCADCD /* Style.css */; };
+		16F2B09F302517DB00FCADCD /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B09E302517DB00FCADCD /* Script.js */; };
+		16F2B0A1302517DB00FCADCD /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F2B0A0302517DB00FCADCD /* ViewController.swift */; };
+		16F2B0A4302517DB00FCADCD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0A2302517DB00FCADCD /* Main.storyboard */; };
+		16F2B0A6302517DC00FCADCD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0A5302517DC00FCADCD /* Assets.xcassets */; };
+		16F2B0AD302517DC00FCADCD /* DOM Change Monitor Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 16F2B0AC302517DC00FCADCD /* DOM Change Monitor Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		16F2B0B2302517DC00FCADCD /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F2B0B1302517DC00FCADCD /* SafariWebExtensionHandler.swift */; };
+		16F2B0C7302517DC00FCADCD /* popup.js in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0BE302517DC00FCADCD /* popup.js */; };
+		16F2B0C8302517DC00FCADCD /* content.css in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0BF302517DC00FCADCD /* content.css */; };
+		16F2B0C9302517DC00FCADCD /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C0302517DC00FCADCD /* background.js */; };
+		16F2B0CA302517DC00FCADCD /* manage.html in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C1302517DC00FCADCD /* manage.html */; };
+		16F2B0CB302517DC00FCADCD /* popup.html in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C2302517DC00FCADCD /* popup.html */; };
+		16F2B0CC302517DC00FCADCD /* manage.js in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C3302517DC00FCADCD /* manage.js */; };
+		16F2B0CD302517DC00FCADCD /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C4302517DC00FCADCD /* icons */; };
+		16F2B0CE302517DC00FCADCD /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C5302517DC00FCADCD /* manifest.json */; };
+		16F2B0CF302517DC00FCADCD /* content.js in Resources */ = {isa = PBXBuildFile; fileRef = 16F2B0C6302517DC00FCADCD /* content.js */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		16F2B0AE302517DC00FCADCD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 16F2B089302517DB00FCADCD /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 16F2B0AB302517DC00FCADCD;
+			remoteInfo = "DOM Change Monitor Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		16F2B0B9302517DC00FCADCD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				16F2B0AD302517DC00FCADCD /* DOM Change Monitor Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		16F2B091302517DB00FCADCD /* DOM Change Monitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "DOM Change Monitor.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16F2B094302517DB00FCADCD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		16F2B098302517DB00FCADCD /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		16F2B09A302517DB00FCADCD /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		16F2B09C302517DB00FCADCD /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		16F2B09E302517DB00FCADCD /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		16F2B0A0302517DB00FCADCD /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		16F2B0A3302517DB00FCADCD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		16F2B0A5302517DC00FCADCD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		16F2B0A7302517DC00FCADCD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		16F2B0AC302517DC00FCADCD /* DOM Change Monitor Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "DOM Change Monitor Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		16F2B0B1302517DC00FCADCD /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		16F2B0B3302517DC00FCADCD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		16F2B0BE302517DC00FCADCD /* popup.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = popup.js; path = ../../ExtensionResources/popup.js; sourceTree = "<group>"; };
+		16F2B0BF302517DC00FCADCD /* content.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = content.css; path = ../../ExtensionResources/content.css; sourceTree = "<group>"; };
+		16F2B0C0302517DC00FCADCD /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = ../../ExtensionResources/background.js; sourceTree = "<group>"; };
+		16F2B0C1302517DC00FCADCD /* manage.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = manage.html; path = ../../ExtensionResources/manage.html; sourceTree = "<group>"; };
+		16F2B0C2302517DC00FCADCD /* popup.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = popup.html; path = ../../ExtensionResources/popup.html; sourceTree = "<group>"; };
+		16F2B0C3302517DC00FCADCD /* manage.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = manage.js; path = ../../ExtensionResources/manage.js; sourceTree = "<group>"; };
+		16F2B0C4302517DC00FCADCD /* icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = icons; path = ../../ExtensionResources/icons; sourceTree = "<group>"; };
+		16F2B0C5302517DC00FCADCD /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../ExtensionResources/manifest.json; sourceTree = "<group>"; };
+		16F2B0C6302517DC00FCADCD /* content.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = content.js; path = ../../ExtensionResources/content.js; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		16F2B08E302517DB00FCADCD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		16F2B0A9302517DC00FCADCD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		16F2B088302517DB00FCADCD = {
+			isa = PBXGroup;
+			children = (
+				16F2B093302517DB00FCADCD /* DOM Change Monitor */,
+				16F2B0B0302517DC00FCADCD /* DOM Change Monitor Extension */,
+				16F2B092302517DB00FCADCD /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		16F2B092302517DB00FCADCD /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				16F2B091302517DB00FCADCD /* DOM Change Monitor.app */,
+				16F2B0AC302517DC00FCADCD /* DOM Change Monitor Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		16F2B093302517DB00FCADCD /* DOM Change Monitor */ = {
+			isa = PBXGroup;
+			children = (
+				16F2B094302517DB00FCADCD /* AppDelegate.swift */,
+				16F2B0A0302517DB00FCADCD /* ViewController.swift */,
+				16F2B0A2302517DB00FCADCD /* Main.storyboard */,
+				16F2B0A5302517DC00FCADCD /* Assets.xcassets */,
+				16F2B0A7302517DC00FCADCD /* Info.plist */,
+				16F2B096302517DB00FCADCD /* Resources */,
+			);
+			path = "DOM Change Monitor";
+			sourceTree = "<group>";
+		};
+		16F2B096302517DB00FCADCD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				16F2B097302517DB00FCADCD /* Main.html */,
+				16F2B09A302517DB00FCADCD /* Icon.png */,
+				16F2B09C302517DB00FCADCD /* Style.css */,
+				16F2B09E302517DB00FCADCD /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		16F2B0B0302517DC00FCADCD /* DOM Change Monitor Extension */ = {
+			isa = PBXGroup;
+			children = (
+				16F2B0BD302517DC00FCADCD /* Resources */,
+				16F2B0B1302517DC00FCADCD /* SafariWebExtensionHandler.swift */,
+				16F2B0B3302517DC00FCADCD /* Info.plist */,
+			);
+			path = "DOM Change Monitor Extension";
+			sourceTree = "<group>";
+		};
+		16F2B0BD302517DC00FCADCD /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				16F2B0BE302517DC00FCADCD /* popup.js */,
+				16F2B0BF302517DC00FCADCD /* content.css */,
+				16F2B0C0302517DC00FCADCD /* background.js */,
+				16F2B0C1302517DC00FCADCD /* manage.html */,
+				16F2B0C2302517DC00FCADCD /* popup.html */,
+				16F2B0C3302517DC00FCADCD /* manage.js */,
+				16F2B0C4302517DC00FCADCD /* icons */,
+				16F2B0C5302517DC00FCADCD /* manifest.json */,
+				16F2B0C6302517DC00FCADCD /* content.js */,
+			);
+			name = Resources;
+			path = "DOM Change Monitor Extension";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		16F2B090302517DB00FCADCD /* DOM Change Monitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 16F2B0BA302517DC00FCADCD /* Build configuration list for PBXNativeTarget "DOM Change Monitor" */;
+			buildPhases = (
+				16F2B08D302517DB00FCADCD /* Sources */,
+				16F2B08E302517DB00FCADCD /* Frameworks */,
+				16F2B08F302517DB00FCADCD /* Resources */,
+				16F2B0B9302517DC00FCADCD /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				16F2B0AF302517DC00FCADCD /* PBXTargetDependency */,
+			);
+			name = "DOM Change Monitor";
+			packageProductDependencies = (
+			);
+			productName = "DOM Change Monitor";
+			productReference = 16F2B091302517DB00FCADCD /* DOM Change Monitor.app */;
+			productType = "com.apple.product-type.application";
+		};
+		16F2B0AB302517DC00FCADCD /* DOM Change Monitor Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 16F2B0B6302517DC00FCADCD /* Build configuration list for PBXNativeTarget "DOM Change Monitor Extension" */;
+			buildPhases = (
+				16F2B0A8302517DC00FCADCD /* Sources */,
+				16F2B0A9302517DC00FCADCD /* Frameworks */,
+				16F2B0AA302517DC00FCADCD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "DOM Change Monitor Extension";
+			packageProductDependencies = (
+			);
+			productName = "DOM Change Monitor Extension";
+			productReference = 16F2B0AC302517DC00FCADCD /* DOM Change Monitor Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		16F2B089302517DB00FCADCD /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					16F2B090302517DB00FCADCD = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					16F2B0AB302517DC00FCADCD = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = 16F2B08C302517DB00FCADCD /* Build configuration list for PBXProject "DOM Change Monitor" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 16F2B088302517DB00FCADCD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 16F2B092302517DB00FCADCD /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				16F2B090302517DB00FCADCD /* DOM Change Monitor */,
+				16F2B0AB302517DC00FCADCD /* DOM Change Monitor Extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		16F2B08F302517DB00FCADCD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16F2B09B302517DB00FCADCD /* Icon.png in Resources */,
+				16F2B0A4302517DB00FCADCD /* Main.storyboard in Resources */,
+				16F2B09F302517DB00FCADCD /* Script.js in Resources */,
+				16F2B099302517DB00FCADCD /* Main.html in Resources */,
+				16F2B0A6302517DC00FCADCD /* Assets.xcassets in Resources */,
+				16F2B09D302517DB00FCADCD /* Style.css in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		16F2B0AA302517DC00FCADCD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16F2B0C7302517DC00FCADCD /* popup.js in Resources */,
+				16F2B0CB302517DC00FCADCD /* popup.html in Resources */,
+				16F2B0C9302517DC00FCADCD /* background.js in Resources */,
+				16F2B0CC302517DC00FCADCD /* manage.js in Resources */,
+				16F2B0CE302517DC00FCADCD /* manifest.json in Resources */,
+				16F2B0C8302517DC00FCADCD /* content.css in Resources */,
+				16F2B0CF302517DC00FCADCD /* content.js in Resources */,
+				16F2B0CD302517DC00FCADCD /* icons in Resources */,
+				16F2B0CA302517DC00FCADCD /* manage.html in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		16F2B08D302517DB00FCADCD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16F2B0A1302517DB00FCADCD /* ViewController.swift in Sources */,
+				16F2B095302517DB00FCADCD /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		16F2B0A8302517DC00FCADCD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16F2B0B2302517DC00FCADCD /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		16F2B0AF302517DC00FCADCD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 16F2B0AB302517DC00FCADCD /* DOM Change Monitor Extension */;
+			targetProxy = 16F2B0AE302517DC00FCADCD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		16F2B097302517DB00FCADCD /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				16F2B098302517DB00FCADCD /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		16F2B0A2302517DB00FCADCD /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				16F2B0A3302517DB00FCADCD /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		16F2B0B4302517DC00FCADCD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		16F2B0B5302517DC00FCADCD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		16F2B0B7302517DC00FCADCD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DOM Change Monitor Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DOM Change Monitor Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jacobreiff.dom-change-monitor.Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		16F2B0B8302517DC00FCADCD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DOM Change Monitor Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DOM Change Monitor Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jacobreiff.dom-change-monitor.Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		16F2B0BB302517DC00FCADCD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DOM Change Monitor/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DOM Change Monitor";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jacobreiff.dom-change-monitor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		16F2B0BC302517DC00FCADCD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "DOM Change Monitor/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "DOM Change Monitor";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.jacobreiff.dom-change-monitor";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		16F2B08C302517DB00FCADCD /* Build configuration list for PBXProject "DOM Change Monitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				16F2B0B4302517DC00FCADCD /* Debug */,
+				16F2B0B5302517DC00FCADCD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		16F2B0B6302517DC00FCADCD /* Build configuration list for PBXNativeTarget "DOM Change Monitor Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				16F2B0B7302517DC00FCADCD /* Debug */,
+				16F2B0B8302517DC00FCADCD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		16F2B0BA302517DC00FCADCD /* Build configuration list for PBXNativeTarget "DOM Change Monitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				16F2B0BB302517DC00FCADCD /* Debug */,
+				16F2B0BC302517DC00FCADCD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 16F2B089302517DB00FCADCD /* Project object */;
+}

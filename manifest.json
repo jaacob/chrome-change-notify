@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "DOM Change Monitor",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "description": "Monitor DOM elements for changes and receive notifications",
   "permissions": [
     "storage",
     "alarms",
     "notifications",
     "activeTab",
-    "scripting"
+    "scripting",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -37,5 +38,8 @@
       "run_at": "document_end"
     }
   ],
-  "options_page": "manage.html"
+  "options_ui": {
+    "page": "manage.html",
+    "open_in_tab": true
+  }
 }
